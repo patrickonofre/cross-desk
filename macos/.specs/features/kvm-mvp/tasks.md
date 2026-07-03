@@ -50,7 +50,10 @@ Gate Fase B: **39 testes, 0 falhas** (`swift test`, 2026-07-03).
 - ☑ **T14 — App menubar** ✅ (R11, R12, R13)
   - **SPEC_DEVIATION:** casca Xcode (.xcodeproj) → executável SPM (`App/`) + `Scripts/make-app.sh` que monta `macos/build/CrossDesk.app` (Info.plist com `LSUIElement`, assinatura ad-hoc). Motivo: 100% scriptável, sem pbxproj à mão. Xcode abre o `Package.swift` normalmente.
   - Assinatura ad-hoc (zero identidades na máquina) → macOS pode re-pedir TCC após rebuild. Cert real quando houver conta Apple Developer.
-- ☐ **T15 — Integração mac↔mac + latência + UAT** (R14, aceitação 1–5) — **próximo; interativo**
+- ◐ **T15 — Integração mac↔mac + latência + UAT** (R14, aceitação 1–5) — **EM ANDAMENTO**
+  - ✅ 2026-07-03 17:12: primeira conexão real mac↔mac (beta.6) + travessia de borda REMOTE⇄LOCAL funcionando (provado por log). Spike T2 implicitamente validado: injeção a partir da queue de transporte funcionou.
+  - Jornada (betas 1–6): TCC podre por assinatura ad-hoc → cert estável; app "fechando" = quit do macOS na concessão + corrida no relaunch; conexão falhando = código de pareamento divergente → normalização + fingerprint visual.
+  - Pendente: aceitação 2 (digitação/modificadores), 4 (Esc 3× com rede cortada), 5 (Wireshark), latência p95 (R14).
   - Requer: usuário conceder TCC nas duas máquinas, segunda máquina mac, Wireshark p/ aceitação 5.
   - Spike T2 (CGEventPost fora da main thread + Esc em REMOTE) valida aqui na prática.
 
