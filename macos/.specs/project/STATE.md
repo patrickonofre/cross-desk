@@ -21,13 +21,14 @@
 - [x] Golden vectors → `.specs/protocol/vectors/v0_1.txt` (provados por teste).
 - [ ] Spike T2 (CGEventPost fora da main thread + Esc em REMOTE) — valida na prática durante T15/UAT.
 - [ ] Pairing code em JSON plano → migrar para Keychain pós-MVP.
-- [ ] Assinatura ad-hoc: TCC pode re-pedir permissão após rebuild — resolver com cert de developer quando houver conta.
+- [x] ~~Assinatura ad-hoc: TCC re-pedindo após rebuild~~ — RESOLVIDO (beta.3): identidade self-signed "CrossDesk Dev" no keychain da máquina de build, make-app.sh auto-detecta (fallback ad-hoc). Cert Apple Developer real continua desejável p/ notarização (elimina o passo do xattr).
 - [ ] Cursor do servidor fica visível parado na borda durante REMOTE (esconder cursor exige APIs privadas/hacks — avaliar pós-MVP).
 
 ## Lições (cont.)
 
 - `NWConnection` presa em `.preparing` (porta morta) nunca vira `.failed` sozinha — timeout de handshake é obrigatório em UDP/DTLS.
 - Enfileirar `send()` público (queue.async) de dentro de um bloco já na queue = mensagem sai depois do teardown. Métodos internos *OnQueue diretos.
+- **Confirmado na prática (beta.1→beta.2):** update de app ad-hoc quebra TCC nas duas máquinas — toggle aparece ligado em System Settings mas o preflight falha, e re-conceder NÃO regrava a entrada. Cura: `tccutil reset All dev.crossdesk.mac` + conceder de novo. Prevenção: identidade de assinatura estável.
 
 ## Lições
 
