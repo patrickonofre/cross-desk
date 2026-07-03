@@ -45,6 +45,14 @@ final class AppState: ObservableObject {
         NSPasteboard.general.setString(config.pairingCode, forType: .string)
     }
 
+    /// 6-char check value derived from the pairing code — must render
+    /// identically on both machines, or the codes differ (top field cause of
+    /// "handshake timeout").
+    var pairingFingerprint: String? {
+        guard !config.pairingCode.isEmpty else { return nil }
+        return PairingKey.fingerprint(psk: PairingKey.psk(fromCode: config.pairingCode))
+    }
+
     var permissionNeededForCurrentRole: Bool {
         switch config.role {
         case .server: !inputMonitoringGranted

@@ -96,6 +96,7 @@ struct MenuBarView: View {
                 }
             }
 
+            pairingFingerprintRow
             serverAddressSection
         } else {
             TextField("Servidor (IP ou hostname)", text: $appState.config.serverHost)
@@ -105,6 +106,25 @@ struct MenuBarView: View {
                 .textFieldStyle(.roundedBorder)
                 .font(.system(.caption, design: .monospaced))
                 .disabled(appState.running)
+            pairingFingerprintRow
+        }
+    }
+
+    /// The same 6 characters must appear on both machines — instant visual
+    /// check that the pairing codes match.
+    @ViewBuilder
+    private var pairingFingerprintRow: some View {
+        if let fingerprint = appState.pairingFingerprint {
+            HStack(spacing: 4) {
+                Text("Verificação:")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text(fingerprint)
+                    .font(.system(.caption2, design: .monospaced).weight(.bold))
+                Text("— deve ser igual nas 2 máquinas")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 

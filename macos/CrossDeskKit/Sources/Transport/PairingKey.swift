@@ -28,10 +28,16 @@ public enum PairingKey {
         SHA256.hash(data: psk).prefix(3).map { String(format: "%02x", $0) }.joined()
     }
 
-    /// HKDF-SHA256(code) → 32-byte PSK.
+    /// HKDF-SHA256(code) → 32-byte PSK. The code is normalized (trim +
+    /// lowercase) before derivation: pairing codes travel between machines by
+    /// hand (chat apps, notes) and pick up invisible whitespace — the #1 cause
+    /// of "handshake timeout" in the field.
     public static func psk(fromCode code: String) -> Data {
+        let normalized = code
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
         let key = HKDF<SHA256>.deriveKey(
-            inputKeyMaterial: SymmetricKey(data: Data(code.utf8)),
+            inputKeyMaterial: SymmetricKey(data: Data(normalized.utf8)),
             salt: salt,
             info: info,
             outputByteCount: 32
