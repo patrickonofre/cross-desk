@@ -164,7 +164,7 @@ struct MenuBarView: View {
                 )
             }
             if appState.permissionNeededForCurrentRole {
-                Text("Concedeu no ajuste? O macOS só aplica após reiniciar o app:")
+                Text("Ao conceder, o macOS pode fechar e reabrir o CrossDesk sozinho — é normal. Se não reabrir ou continuar ⚠️:")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

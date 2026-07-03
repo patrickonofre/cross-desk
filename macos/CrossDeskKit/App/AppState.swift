@@ -22,6 +22,8 @@ final class AppState: ObservableObject {
         config = loaded
         saveConfig()
         refreshPermissions()
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+        Log.app.info("app launched (build \(build, privacy: .public)), role \(loaded.role.rawValue, privacy: .public)")
     }
 
     func refreshPermissions() {
@@ -106,11 +108,17 @@ final class AppState: ObservableObject {
     /// Accessibility/Input Monitoring grants only take effect on a fresh
     /// process (per-process TCC cache) — relaunch instead of asking the user
     /// to quit and reopen manually.
+    ///
+    /// The relauncher must survive this process's death: a bare `open -n`
+    /// fired right before terminate() races the exit and the new instance
+    /// may never launch. Detached shell + delay reparents to launchd and
+    /// starts the new instance after the old one is gone.
     func relaunch() {
-        let path = Bundle.main.bundlePath
+        Log.app.info("relaunch requested")
+        let path = Bundle.main.bundlePath.replacingOccurrences(of: "'", with: "'\\''")
         let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        task.arguments = ["-n", path]
+        task.executableURL = URL(fileURLWithPath: "/bin/sh")
+        task.arguments = ["-c", "sleep 0.7; /usr/bin/open -n '\(path)'"]
         try? task.run()
         NSApplication.shared.terminate(nil)
     }
