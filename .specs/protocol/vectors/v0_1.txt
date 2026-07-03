@@ -1,0 +1,20 @@
+# CrossDesk Protocol v0.1 — golden test vectors
+# Format: <name> <message description> <canonical bytes as lowercase hex>
+# Every implementation (macOS/Windows/Linux) MUST encode these messages to
+# exactly these bytes and decode these bytes back to these messages.
+# Verified by: macos/CrossDeskKit/Tests/ProtocolTests/MessageTests.swift
+
+hello        HELLO(proto_version=1, name="mac")          0106000100036d6163
+hello_ack    HELLO_ACK(proto_version=1)                  0202000100
+heartbeat    HEARTBEAT                                   030000
+bye          BYE                                         040000
+enter        ENTER(x=0.5, y=0.25)                        1008000000003f0000803e
+leave        LEAVE                                       110000
+mouse_move   MOUSE_MOVE(dx=10.0, dy=-3.5)                20080000002041000060c0
+mouse_button MOUSE_BUTTON(button=1, pressed=1)           2102000101
+scroll       SCROLL(dx=0.0, dy=1.0)                      220800000000000000803f
+key          KEY(hid_usage=0x0004, pressed=1)            300300040001
+
+# Compound datagram: ENTER + MOUSE_MOVE + KEY-down + KEY-up concatenated
+# (framing test — one datagram, many messages)
+compound     ENTER(0.0,0.5)+MOVE(5.0,5.0)+KEY(0x04,1)+KEY(0x04,0) 100800000000000000003f2008000000a0400000a040300300040001300300040000
