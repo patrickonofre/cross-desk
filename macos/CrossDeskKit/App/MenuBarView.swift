@@ -18,6 +18,11 @@ struct MenuBarView: View {
         .padding(14)
         .frame(width: 320)
         .onAppear { appState.refreshPermissions() }
+        // TCC grants happen outside the app (System Settings); poll while the
+        // panel is open so the ⚠️ flips to ✓ without user interaction.
+        .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in
+            appState.refreshPermissions()
+        }
     }
 
     private var header: some View {
@@ -157,6 +162,12 @@ struct MenuBarView: View {
                     request: { InputInjector.requestPermission() },
                     openSettings: Permissions.openAccessibilitySettings
                 )
+            }
+            if appState.permissionNeededForCurrentRole {
+                Text("Concedeu e continua ⚠️? Remova o CrossDesk da lista no ajuste (botão −), adicione de novo e reabra o app.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

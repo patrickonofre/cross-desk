@@ -2,9 +2,9 @@
 # Builds CrossDesk.app (menubar app) from the SPM executable.
 # Output: macos/build/CrossDesk.app
 #
-# Signing: ad-hoc (`codesign -s -`) while there is no Apple Developer
-# identity. macOS may re-ask for the TCC permissions after a rebuild because
-# the ad-hoc signature changes — re-grant in System Settings when that happens.
+# Signing: uses the self-signed "CrossDesk Dev" identity when present in the
+# keychain (stable identity → TCC permissions survive rebuilds). Falls back
+# to ad-hoc, which makes macOS re-ask permissions after every rebuild.
 # UNIVERSAL=1 builds a fat binary (arm64 + x86_64) for distribution.
 set -euo pipefail
 
@@ -40,7 +40,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<'PLIST'
     <key>CFBundleShortVersionString</key>
     <string>0.1.0</string>
     <key>CFBundleVersion</key>
-    <string>2</string>
+    <string>3</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>LSUIElement</key>
@@ -51,6 +51,13 @@ cat > "$APP_DIR/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-codesign --force --sign - "$APP_DIR"
+if security find-identity -v -p codesigning 2>/dev/null | grep -q "CrossDesk Dev"; then
+    SIGN_ID="CrossDesk Dev"
+else
+    SIGN_ID="-"
+    echo "AVISO: identidade 'CrossDesk Dev' ausente — assinando ad-hoc (TCC vai re-pedir a cada build)"
+fi
+codesign --force --sign "$SIGN_ID" "$APP_DIR"
+echo "Assinado com: $SIGN_ID"
 
 echo "OK: $(cd "$(dirname "$APP_DIR")" && pwd)/$(basename "$APP_DIR")"
