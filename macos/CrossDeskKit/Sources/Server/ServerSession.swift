@@ -21,8 +21,6 @@ public final class ServerSession: @unchecked Sendable {
     private let screens: @Sendable () -> [CGRect]
 
     private var remote = false
-    private var virtualCursor: VirtualCursor?
-    private var scale = CGSize(width: 1, height: 1)
     private var exitScreen = CGRect.zero
     private var escape = EmergencyEscape()
     private var peerName = ""
@@ -35,7 +33,7 @@ public final class ServerSession: @unchecked Sendable {
         pairingCode: String,
         edgeSide: EdgeSide,
         capture: InputCapture = InputCapture(),
-        screens: @escaping @Sendable () -> [CGRect] = ServerSession.activeDisplayBounds
+        screens: @escaping @Sendable () -> [CGRect] = Displays.activeBounds
     ) {
         self.capture = capture
         self.transport = DTLSServer(port: port, psk: PairingKey.psk(fromCode: pairingCode))
@@ -90,8 +88,20 @@ public final class ServerSession: @unchecked Sendable {
             }
             peerName = ""
             onState?(.waitingPeer)
-        case .messages:
-            break // v0.1: no client→server input messages
+        case let .messages(messages):
+            for message in messages {
+                // Client crossed its return edge (client-side detection — it
+                // owns its own topology). May arrive duplicated (UDP retry);
+                // once LOCAL, extras are ignored.
+                if case let .leaveRequest(x, y) = message, remote {
+                    let coordinate: CGFloat = switch detector.side {
+                    case .left, .right: CGFloat(y)
+                    case .top, .bottom: CGFloat(x)
+                    }
+                    Log.session.info("server session: LEAVE_REQUEST from client")
+                    returnToLocal(sendLeave: true, exitCoordinate: coordinate)
+                }
+            }
         }
     }
 
@@ -110,13 +120,14 @@ public final class ServerSession: @unchecked Sendable {
         // Crossed: freeze the local cursor and start streaming to the client.
         let screen = allScreens.first { $0.insetBy(dx: -1, dy: -1).contains(location) } ?? .zero
         exitScreen = screen
-        scale = screen.size
-        virtualCursor = VirtualCursor(entry: entry, serverSide: detector.side)
         remote = true
         capture.suppressing = true
         CGAssociateMouseAndMouseCursorPosition(0)
         Log.session.info("server session: edge crossed → REMOTE")
-        transport.send([.enter(x: Float(entry.x), y: Float(entry.y))])
+        // The client enters through the edge opposite to ours and detects the
+        // return crossing itself (LEAVE_REQUEST) — no server-side simulation
+        // of the remote cursor.
+        transport.send([.enter(x: Float(entry.x), y: Float(entry.y), edge: detector.side.opposite)])
         onState?(.controllingRemote(peer: peerName))
     }
 
@@ -125,13 +136,7 @@ public final class ServerSession: @unchecked Sendable {
     private func handleRemote(_ event: CapturedEvent) {
         switch event {
         case let .mouseMoved(dx, dy, _):
-            guard var cursor = virtualCursor else { return }
-            if let exitCoordinate = cursor.apply(dx: dx, dy: dy, scale: scale) {
-                returnToLocal(sendLeave: true, exitCoordinate: exitCoordinate)
-            } else {
-                virtualCursor = cursor
-                transport.send([.mouseMove(dx: Float(dx), dy: Float(dy))])
-            }
+            transport.send([.mouseMove(dx: Float(dx), dy: Float(dy))])
         case let .mouseButton(button, isDown):
             transport.send([.mouseButton(button: button, pressed: isDown)])
         case let .scroll(dx, dy):
@@ -170,20 +175,9 @@ public final class ServerSession: @unchecked Sendable {
             CGWarpMouseCursorPosition(point)
         }
 
-        virtualCursor = nil
         if sendLeave {
             transport.send([.leave])
         }
         onState?(peerName.isEmpty ? .waitingPeer : .connected(peer: peerName))
-    }
-
-    // MARK: - Displays
-
-    public static func activeDisplayBounds() -> [CGRect] {
-        var count: UInt32 = 0
-        CGGetActiveDisplayList(0, nil, &count)
-        var displays = [CGDirectDisplayID](repeating: 0, count: Int(count))
-        CGGetActiveDisplayList(count, &displays, &count)
-        return displays.map(CGDisplayBounds)
     }
 }

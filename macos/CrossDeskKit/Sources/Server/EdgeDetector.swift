@@ -1,21 +1,6 @@
 import Foundation
 import CoreGraphics
 
-/// Which edge of the server's displays hands control to the client.
-public enum EdgeSide: String, Codable, Equatable, Sendable, CaseIterable {
-    case left, right, top, bottom
-
-    /// The client edge the cursor enters from (server right → client left, etc.).
-    public var opposite: EdgeSide {
-        switch self {
-        case .left: .right
-        case .right: .left
-        case .top: .bottom
-        case .bottom: .top
-        }
-    }
-}
-
 /// Server-side edge crossing detection, pure geometry (testable headless).
 ///
 /// A crossing only triggers on an *outer* edge: if another server display sits
@@ -71,49 +56,6 @@ public struct EdgeDetector: Sendable {
     }
 }
 
-/// Tracks where the cursor "is" on the client while control is remote.
-///
-/// The client's real resolution never crosses the wire; deltas are normalized
-/// using the *server* screen size as a scale proxy (PROTOCOL.md §5). With
-/// dissimilar resolutions the speed mapping distorts slightly — accepted for
-/// the MVP (context.md #8).
-public struct VirtualCursor: Sendable {
-    /// Normalized position on the client screen, 0...1.
-    public private(set) var position: CGPoint
-    /// The client edge that returns control to the server.
-    public let returnSide: EdgeSide
-
-    public init(entry: CGPoint, serverSide: EdgeSide) {
-        self.position = entry
-        self.returnSide = serverSide.opposite
-    }
-
-    /// Applies a pixel delta (scaled by `scale`, the server screen size).
-    /// Returns the normalized exit coordinate along the return edge when the
-    /// virtual cursor leaves through it; nil while control stays remote.
-    public mutating func apply(dx: CGFloat, dy: CGFloat, scale: CGSize) -> CGFloat? {
-        position.x += dx / scale.width
-        position.y += dy / scale.height
-
-        let exited: Bool
-        switch returnSide {
-        case .left: exited = position.x < 0
-        case .right: exited = position.x > 1
-        case .top: exited = position.y < 0
-        case .bottom: exited = position.y > 1
-        }
-
-        position.x = position.x.clamped01
-        position.y = position.y.clamped01
-
-        guard exited else { return nil }
-        switch returnSide {
-        case .left, .right: return position.y
-        case .top, .bottom: return position.x
-        }
-    }
-}
-
 extension CGFloat {
-    fileprivate var clamped01: CGFloat { Swift.min(1.0, Swift.max(0.0, self)) }
+    var clamped01: CGFloat { Swift.min(1.0, Swift.max(0.0, self)) }
 }

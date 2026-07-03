@@ -36,8 +36,9 @@ Cada datagrama DTLS carrega **uma ou mais mensagens** concatenadas:
 | 0x02 | HELLO_ACK | S→C | `proto_version u16` (versão negociada = min das duas) |
 | 0x03 | HEARTBEAT | ambas | vazio; enviar a cada 2 s; timeout 6 s |
 | 0x04 | BYE | ambas | vazio; encerramento limpo |
-| 0x10 | ENTER | S→C | `x f32` · `y f32` (posição normalizada 0.0–1.0 na tela do cliente) — cursor entrou na tela do cliente |
+| 0x10 | ENTER | S→C | `x f32` · `y f32` (posição normalizada 0.0–1.0 no espaço de telas do cliente) · `edge u8` (borda do cliente por onde o cursor entra: 0=left, 1=right, 2=top, 3=bottom — também é a borda de retorno) |
 | 0x11 | LEAVE | S→C | vazio — controle voltou ao servidor; cliente libera modificadores pressionados |
+| 0x12 | LEAVE_REQUEST | C→S | `x f32` · `y f32` (posição normalizada de saída) — cursor do cliente cruzou a borda de retorno; servidor responde com LEAVE. Pode repetir até o LEAVE chegar (perda UDP) — servidor DEVE tratar como idempotente |
 | 0x20 | MOUSE_MOVE | S→C | `dx f32` · `dy f32` (deltas relativos, px) |
 | 0x21 | MOUSE_BUTTON | S→C | `button u8` (1=esq, 2=dir, 3=meio, 4+=extra) · `pressed u8` (0/1) |
 | 0x22 | SCROLL | S→C | `dx f32` · `dy f32` (linhas; positivo = direita/baixo) |
@@ -56,10 +57,12 @@ Cada datagrama DTLS carrega **uma ou mais mensagens** concatenadas:
 
 ## 5. Semântica
 
-- MOUSE_MOVE são **deltas relativos**; o cliente é dono da posição absoluta do seu cursor (clamp nas bordas da própria tela).
-- ENTER carrega posição normalizada para o cursor "nascer" no ponto correspondente da borda.
+- **Cada máquina é dona da própria geometria de telas** — resolução e layout de monitores NUNCA trafegam. Posições no fio são sempre normalizadas 0.0–1.0.
+- MOUSE_MOVE são **deltas relativos**; o cliente é dono da posição absoluta do seu cursor, contido na topologia real dos seus monitores (desliza em bordas, cruza para monitores adjacentes).
+- ENTER carrega posição normalizada (sobre o bounding box da união das telas do cliente) + a borda de entrada, para o cursor "nascer" no ponto correspondente. A borda de entrada é também a borda de retorno.
+- **A borda de retorno é detectada no CLIENTE** (dono da verdade sobre a posição do seu cursor): ao cruzar a borda externa de retorno, envia LEAVE_REQUEST com a posição normalizada de saída; o servidor reposiciona seu cursor físico e responde LEAVE. LEAVE_REQUEST pode se repetir a cada movimento adicional "para fora" enquanto o LEAVE não chega — retry natural sobre UDP; servidor idempotente (ignora quando já está em LOCAL).
 - Após LEAVE, cliente DEVE soltar (key-up sintético) toda tecla que estiver logicamente pressionada — evita modificador preso.
-- Eventos de input só fluem S→C. Bordas do cliente que devolvem o cursor são detectadas **no servidor** (via geometria do layout), não pelo cliente.
+- Eventos de input fluem S→C; LEAVE_REQUEST é a única mensagem de controle C→S (além de HELLO/HEARTBEAT/BYE).
 - Sem ACK por evento (UDP é lossy por design; perda de MOUSE_MOVE é tolerável). KEY e MOUSE_BUTTON: v0.1 aceita perda; se na prática incomodar, v0.2 adiciona canal confiável só para eventos discretos (registrado como risco).
 
 ## 6. Versionamento
@@ -71,3 +74,4 @@ Cada datagrama DTLS carrega **uma ou mais mensagens** concatenadas:
 
 - v0.1 (2026-07-03): draft inicial.
 - v0.1 (2026-07-03): auth trocada de certs+TOFU para DTLS-PSK com código de pareamento gerado (resultado do spike T1 — evita geração de certificado, UX mais simples).
+- v0.1 (2026-07-03): geometria independente por máquina — ENTER ganha `edge u8`; nova mensagem LEAVE_REQUEST (0x12, C→S); borda de retorno detectada no cliente (antes: cursor virtual simulado no servidor — causava drift quando as resoluções diferiam). Golden vectors regenerados.

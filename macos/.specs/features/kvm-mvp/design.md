@@ -43,16 +43,17 @@ Casca Xcode importa `CrossDeskKit`. `swift test` roda no package sem GUI — gat
 ```
         cursor cruza borda mapeada
  LOCAL ────────────────────────────▶ REMOTE
-   ▲    ENTER(x,y) · tap suprime      │
+   ▲    ENTER(x,y,edge) · tap suprime │
    │                                  │ eventos → encode → DTLS
-   │  cursor virtual atinge borda     │
-   │  oposta · LEAVE · tap libera     │
+   │  cliente cruza borda de retorno  │
+   │  → LEAVE_REQUEST · servidor      │
+   │  warpa cursor · LEAVE · libera   │
    └──────────────────────────────────┘
         (também: Esc 3×, desconexão, stop — sempre → LOCAL)
 ```
 
-- Em REMOTE, o tap continua recebendo eventos locais mas os **suprime** (retorna NULL no callback) e os converte em mensagens.
-- Cursor virtual: servidor acumula deltas para saber onde o cursor "está" na tela do cliente (usando geometria normalizada) — é assim que detecta a borda de retorno (protocolo §5).
+- Em REMOTE, o tap continua recebendo eventos locais mas os **suprime** (retorna NULL no callback) e os converte em mensagens. O servidor NÃO simula a posição remota — só streama deltas.
+- **Geometria independente por máquina (protocolo §5):** o cliente contém o cursor na topologia real dos seus monitores (`ScreenTopology`: entrada normalizada→ponto concreto, slide/clamp multi-monitor, detecção de borda externa de retorno) e pede o retorno via LEAVE_REQUEST. Substitui o cursor virtual do servidor, que driftava com resoluções diferentes (duas contabilidades da mesma posição).
 - `CGEventTap` roda em thread própria com `CFRunLoop`; timeout do tap (`kCGEventTapDisabledByTimeout`) → re-enable imediato + log.
 
 ## Fluxo de dados (servidor em REMOTE)
@@ -83,4 +84,4 @@ Cliente espelhado: `DTLSClient.receive ─▶ Message.decode ─▶ ClientSessio
 
 ## Traceabilidade
 
-R1→`InputCapture` · R2,R3→`EdgeDetector`+`ServerSession` · R4→`EmergencyEscape` · R5,R15→`Protocol/` · R6→`InputInjector` · R7→`PressedKeys` · R8→`Message.hello` · R9→`Transport/` · R10→`DTLSClient` · R11→`MenuBarView` · R12→`Permissions/` · R13→`Config/` · R14→medição no UAT
+R1→`InputCapture` · R2→`EdgeDetector`+`ServerSession` · R3→`ScreenTopology`+`InputInjector.onExitEdge`+`ServerSession` (LEAVE_REQUEST) · R4→`EmergencyEscape` · R5,R15→`Protocol/` · R6→`InputInjector`+`ScreenTopology` · R7→`PressedKeys` · R8→`Message.hello`+protocolo §5 · R9→`Transport/` · R10→`DTLSClient` · R11→`MenuBarView` · R12→`Permissions/` · R13→`Config/` · R14→medição no UAT

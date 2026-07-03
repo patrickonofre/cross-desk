@@ -52,7 +52,7 @@ final class TransportLoopbackTests: XCTestCase {
     func testServerToClientMessages() throws {
         let received = expectation(description: "client received input messages")
         let sent: [Message] = [
-            .enter(x: 0.0, y: 0.5),
+            .enter(x: 0.0, y: 0.5, edge: .left),
             .mouseMove(dx: 12, dy: -4),
             .key(hidUsage: 0x04, pressed: true),
         ]

@@ -4,14 +4,22 @@ import CoreGraphics
 /// Applies remote input messages to the local machine via CGEventPost (R6).
 /// Requires the Accessibility TCC permission.
 ///
-/// Owns the client-side cursor position (clamped to the local screen), click
-/// counting for double-clicks, modifier flags, and the pressed-key registry
-/// used for synthetic releases (R7).
+/// Owns the client-side cursor position (contained to the local display
+/// topology — all monitors), click counting for double-clicks, modifier flags,
+/// and the pressed-key registry used for synthetic releases (R7). Detects the
+/// return-edge crossing locally and reports it via `onExitEdge` (R3): the
+/// client is the authority on where its own cursor is.
 public final class InputInjector: @unchecked Sendable {
     private let source = CGEventSource(stateID: .hidSystemState)
-    private let screen: () -> CGRect
+    private let screens: () -> [CGRect]
+
+    /// Return-edge crossing (normalized exit position, PROTOCOL.md §3
+    /// LEAVE_REQUEST). Called from whatever thread `apply` runs on; fires on
+    /// every outward move at the edge until control actually returns.
+    public var onExitEdge: (@Sendable (CGPoint) -> Void)?
 
     private var position = CGPoint.zero
+    private var returnEdge: EdgeSide?
     private var pressedKeys = PressedKeys()
     private var heldButtons: Set<UInt8> = []
     private var flags: CGEventFlags = []
@@ -34,40 +42,40 @@ public final class InputInjector: @unchecked Sendable {
         CGRequestPostEventAccess()
     }
 
-    /// `screen` supplies the local main-display bounds (CG global coordinates);
+    /// `screens` supplies all local display bounds (CG global coordinates);
     /// injected as a closure for testability and display reconfiguration.
-    public init(screen: @escaping @Sendable () -> CGRect = {
-        CGDisplayBounds(CGMainDisplayID())
-    }) {
-        self.screen = screen
+    public init(screens: @escaping @Sendable () -> [CGRect] = Displays.activeBounds) {
+        self.screens = screens
     }
 
     // MARK: - Message application
 
     public func apply(_ message: Message) {
         switch message {
-        case let .enter(x, y):
-            let bounds = screen()
-            position = CGPoint(
-                x: bounds.minX + CGFloat(x) * bounds.width,
-                y: bounds.minY + CGFloat(y) * bounds.height
-            )
+        case let .enter(x, y, edge):
+            returnEdge = edge
+            position = ScreenTopology(screens: screens())
+                .entryPoint(edge: edge, x: CGFloat(x), y: CGFloat(y))
             postMouseMove()
         case .leave:
+            returnEdge = nil
             releaseEverything()
         case let .mouseMove(dx, dy):
-            let bounds = screen()
-            position.x = min(max(position.x + CGFloat(dx), bounds.minX), bounds.maxX - 1)
-            position.y = min(max(position.y + CGFloat(dy), bounds.minY), bounds.maxY - 1)
+            let moved = ScreenTopology(screens: screens())
+                .move(from: position, dx: CGFloat(dx), dy: CGFloat(dy), returnEdge: returnEdge)
+            position = moved.position
             postMouseMove()
+            if let exit = moved.exit {
+                onExitEdge?(exit)
+            }
         case let .mouseButton(button, pressed):
             postMouseButton(button: button, isDown: pressed)
         case let .scroll(dx, dy):
             postScroll(dx: Double(dx), dy: Double(dy))
         case let .key(hidUsage, pressed):
             postKey(hidUsage: hidUsage, isDown: pressed)
-        case .hello, .helloAck, .heartbeat, .bye:
-            break // transport-level, never reaches the injector
+        case .hello, .helloAck, .heartbeat, .bye, .leaveRequest:
+            break // transport-level / C→S only, never reaches the injector
         }
     }
 

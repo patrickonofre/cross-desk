@@ -12,15 +12,15 @@ Duas máquinas macOS na mesma LAN: uma servidor (dona de teclado/mouse), outra c
 
 - **R1** — Capturar mouse e teclado globais via CGEventTap quando o controle está no cliente; eventos NÃO chegam às apps locais do servidor (tap com supressão, `kCGEventTapOptionDefault`).
 - **R2** — Detectar cruzamento de borda: lado configurável (esquerda/direita/cima/baixo) mapeado para o cliente. Ao cruzar: enviar `ENTER` com posição normalizada, ocultar transição (cursor local para de mover).
-- **R3** — Devolver controle quando o cursor virtual do cliente atinge a borda oposta (geometria calculada no servidor, conforme protocolo §5): enviar `LEAVE`, restaurar cursor local.
+- **R3** — Devolver controle quando o cliente reporta `LEAVE_REQUEST` (borda de retorno detectada **no cliente**, dono da própria geometria — protocolo §5): reposicionar o cursor físico na altura correspondente, enviar `LEAVE`, restaurar cursor local. Idempotente a LEAVE_REQUEST duplicado.
 - **R4** — Atalho de emergência global (padrão: pressionar `Esc` 3× em 1 s) devolve o controle ao servidor incondicionalmente — rede caída não pode sequestrar o input.
 - **R5** — Encodar eventos conforme [PROTOCOL.md](../../../../.specs/protocol/PROTOCOL.md) v0.1 (deltas relativos, HID usages).
 
 ### Cliente
 
-- **R6** — Receber eventos e injetar via CGEventPost: movimento relativo com clamp nas bordas da própria tela, cliques, scroll, teclas (HID→CGKeyCode).
+- **R6** — Receber eventos e injetar via CGEventPost: movimento relativo contido na **topologia real de todos os monitores locais** (desliza em bordas, cruza para monitor adjacente), cliques, scroll, teclas (HID→CGKeyCode).
 - **R7** — Em `LEAVE` ou desconexão: key-up sintético de toda tecla logicamente pressionada (nunca deixar modificador preso).
-- **R8** — Reportar geometria da tela principal no HELLO (nome da máquina; resolução não trafega — posição é normalizada).
+- **R8** — Identificar-se no HELLO só pelo nome da máquina; **geometria/resolução nunca trafegam** — cada máquina é dona da própria topologia (posições no fio são normalizadas). Cliente detecta a própria borda de retorno e envia `LEAVE_REQUEST`.
 
 ### Transporte e segurança
 
@@ -40,11 +40,11 @@ Duas máquinas macOS na mesma LAN: uma servidor (dona de teclado/mouse), outra c
 
 ## Fora de escopo (MVP)
 
-- Clipboard, discovery mDNS, pareamento por código, multi-cliente (>1), layout drag-and-drop, autostart, notarização/distribuição, robustez a sleep/wake, múltiplos monitores no cliente (usa tela principal).
+- Clipboard, discovery mDNS, pareamento por código, multi-cliente (>1), layout drag-and-drop, autostart, notarização/distribuição, robustez a sleep/wake.
 
 ## Aceitação (UAT)
 
-1. Dois macs, mesma LAN. Servidor configura borda direita → cliente. Cursor cruza, aparece no cliente na altura correspondente.
+1. Dois macs, mesma LAN, **resoluções diferentes**. Servidor configura borda direita → cliente. Cursor cruza, aparece no cliente na altura correspondente; ida e volta repetidas não acumulam desvio (sem drift).
 2. Digitar no cliente (incluindo ⌘C/⌘V, acentos via modificadores) funciona; apps locais do servidor não recebem os eventos.
 3. Cursor volta pela borda esquerda do cliente. Modificadores não ficam presos.
 4. Cabo de rede puxado com controle no cliente → atalho de emergência devolve o input em ≤ 1 s.

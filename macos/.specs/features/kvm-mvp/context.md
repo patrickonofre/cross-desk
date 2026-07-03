@@ -11,6 +11,6 @@ Decisões assumidas pelo agente com defaults sensatos (usuário pode reverter qu
 | 5 | Formato de config | **JSON + Codable** | Nativo Swift, zero dependência | Trivial |
 | 6 | Atalho de emergência | **Esc 3× em 1 s** | Não conflita com apps; funciona mesmo com tap ativo | Trivial (configurável depois) |
 | 7 | Assinatura em dev | **Ad-hoc estável (mesmo certificado local)** | CGEventTap é desabilitado silenciosamente se assinatura mudar; conta Apple Developer só na distribuição | — |
-| 8 | Múltiplos monitores | **Servidor: suporta (borda na tela onde está o cursor). Cliente: só tela principal** | Corta metade da complexidade de geometria | Médio (pós-MVP) |
+| 8 | Múltiplos monitores | ~~Cliente: só tela principal~~ **REVISTO (T16): cliente usa topologia completa dos monitores** | Decisão original assumia que o cursor virtual do servidor bastava; na prática driftava com resoluções diferentes → cliente virou dono da própria geometria (LEAVE_REQUEST) e o suporte multi-monitor veio de graça via `ScreenTopology` | — |
 
 Nenhuma dessas travava o início; se alguma estiver errada, ajustar aqui e refletir em spec/design.

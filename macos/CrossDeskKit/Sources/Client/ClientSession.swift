@@ -38,6 +38,12 @@ public final class ClientSession: @unchecked Sendable {
     }
 
     private func wire() {
+        // Return edge crossed locally (client owns its own topology, R3):
+        // ask the server for control back. Repeats on further outward moves
+        // until the server's LEAVE lands — natural retry over lossy UDP.
+        injector.onExitEdge = { [weak self] exit in
+            self?.transport.send([.leaveRequest(x: Float(exit.x), y: Float(exit.y))])
+        }
         transport.onEvent = { [weak self] event in
             guard let self else { return }
             switch event {

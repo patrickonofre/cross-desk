@@ -19,8 +19,12 @@ public enum Message: Equatable, Sendable {
     case helloAck(protoVersion: UInt16)
     case heartbeat
     case bye
-    case enter(x: Float, y: Float)
+    /// `edge` = client edge the cursor enters through (also its return edge).
+    case enter(x: Float, y: Float, edge: EdgeSide)
     case leave
+    /// C→S: client cursor crossed its return edge; may repeat until LEAVE
+    /// arrives (UDP loss) — the server must treat it as idempotent.
+    case leaveRequest(x: Float, y: Float)
     case mouseMove(dx: Float, dy: Float)
     case mouseButton(button: UInt8, pressed: Bool)
     case scroll(dx: Float, dy: Float)
@@ -33,6 +37,7 @@ public enum Message: Equatable, Sendable {
         case bye = 0x04
         case enter = 0x10
         case leave = 0x11
+        case leaveRequest = 0x12
         case mouseMove = 0x20
         case mouseButton = 0x21
         case scroll = 0x22
@@ -68,12 +73,17 @@ extension Message {
             return (.heartbeat, payload)
         case .bye:
             return (.bye, payload)
-        case let .enter(x, y):
+        case let .enter(x, y, edge):
             payload.appendLE(x.bitPattern)
             payload.appendLE(y.bitPattern)
+            payload.append(edge.wireValue)
             return (.enter, payload)
         case .leave:
             return (.leave, payload)
+        case let .leaveRequest(x, y):
+            payload.appendLE(x.bitPattern)
+            payload.appendLE(y.bitPattern)
+            return (.leaveRequest, payload)
         case let .mouseMove(dx, dy):
             payload.appendLE(dx.bitPattern)
             payload.appendLE(dy.bitPattern)
@@ -135,10 +145,15 @@ extension Message {
         case .bye:
             return .bye
         case .enter:
-            guard let x = try? reader.f32(), let y = try? reader.f32() else { throw invalid() }
-            return .enter(x: x, y: y)
+            guard let x = try? reader.f32(), let y = try? reader.f32(),
+                  let edgeByte = try? reader.u8(),
+                  let edge = EdgeSide(wireValue: edgeByte) else { throw invalid() }
+            return .enter(x: x, y: y, edge: edge)
         case .leave:
             return .leave
+        case .leaveRequest:
+            guard let x = try? reader.f32(), let y = try? reader.f32() else { throw invalid() }
+            return .leaveRequest(x: x, y: y)
         case .mouseMove:
             guard let dx = try? reader.f32(), let dy = try? reader.f32() else { throw invalid() }
             return .mouseMove(dx: dx, dy: dy)

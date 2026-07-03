@@ -57,6 +57,14 @@ Gate Fase B: **39 testes, 0 falhas** (`swift test`, 2026-07-03).
   - Requer: usuário conceder TCC nas duas máquinas, segunda máquina mac, Wireshark p/ aceitação 5.
   - Spike T2 (CGEventPost fora da main thread + Esc em REMOTE) valida aqui na prática.
 
+## Fase E — Correções pós-primeira-conexão
+
+- ☑ **T16 — Geometria independente por máquina** ✅ (2026-07-03) (R3, R6, R8)
+  - Problema (achado no UAT do T15): cursor "se perdia" — o servidor simulava a posição remota (`VirtualCursor`) escalando deltas pela tela DO SERVIDOR, enquanto o cliente movia em px reais da tela DELE. Resoluções diferentes = duas contabilidades divergentes → borda de retorno disparava cedo/tarde/nunca. Cliente ainda clampava só na tela principal.
+  - Cura: cada máquina dona da própria topologia (protocolo §5). `ENTER` ganha `edge u8`; nova msg `LEAVE_REQUEST` (0x12, C→S); cliente detecta a própria borda de retorno via `ScreenTopology` (novo, geometria pura: entrada normalizada→ponto, contenção multi-monitor com slide, saída só por borda externa); `VirtualCursor` removido do servidor (fim do drift estrutural). LEAVE_REQUEST re-enviado a cada movimento "para fora" na borda = retry natural contra perda UDP; servidor idempotente.
+  - Bônus: multi-monitor no cliente saiu do "fora de escopo" — contenção cobre todos os monitores.
+  - Prova: 63 testes (14 novos `ScreenTopologyTests`, golden vectors regenerados), build da app OK.
+
 ## Ordem de execução sugerida
 
-T1+T2 (paralelo) → T3 → T4+T6+T7+T8+T9 (paralelo) → T5 → T10 → T11+T12 → T13 → T14 → T15
+T1+T2 (paralelo) → T3 → T4+T6+T7+T8+T9 (paralelo) → T5 → T10 → T11+T12 → T13 → T14 → T15 → T16 (surgiu do UAT do T15)

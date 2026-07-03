@@ -4,17 +4,18 @@
 # exactly these bytes and decode these bytes back to these messages.
 # Verified by: macos/CrossDeskKit/Tests/ProtocolTests/MessageTests.swift
 
-hello        HELLO(proto_version=1, name="mac")          0106000100036d6163
-hello_ack    HELLO_ACK(proto_version=1)                  0202000100
-heartbeat    HEARTBEAT                                   030000
-bye          BYE                                         040000
-enter        ENTER(x=0.5, y=0.25)                        1008000000003f0000803e
-leave        LEAVE                                       110000
-mouse_move   MOUSE_MOVE(dx=10.0, dy=-3.5)                20080000002041000060c0
-mouse_button MOUSE_BUTTON(button=1, pressed=1)           2102000101
-scroll       SCROLL(dx=0.0, dy=1.0)                      220800000000000000803f
-key          KEY(hid_usage=0x0004, pressed=1)            300300040001
+hello         HELLO(proto_version=1, name="mac")            0106000100036d6163
+hello_ack     HELLO_ACK(proto_version=1)                    0202000100
+heartbeat     HEARTBEAT                                     030000
+bye           BYE                                           040000
+enter         ENTER(x=0.5, y=0.25, edge=0/left)             1009000000003f0000803e00
+leave         LEAVE                                         110000
+leave_request LEAVE_REQUEST(x=0.0, y=0.5)                   120800000000000000003f
+mouse_move    MOUSE_MOVE(dx=10.0, dy=-3.5)                  20080000002041000060c0
+mouse_button  MOUSE_BUTTON(button=1, pressed=1)             2102000101
+scroll        SCROLL(dx=0.0, dy=1.0)                        220800000000000000803f
+key           KEY(hid_usage=0x0004, pressed=1)              300300040001
 
 # Compound datagram: ENTER + MOUSE_MOVE + KEY-down + KEY-up concatenated
 # (framing test — one datagram, many messages)
-compound     ENTER(0.0,0.5)+MOVE(5.0,5.0)+KEY(0x04,1)+KEY(0x04,0) 100800000000000000003f2008000000a0400000a040300300040001300300040000
+compound      ENTER(0.0,0.5,left)+MOVE(5.0,5.0)+KEY(0x04,1)+KEY(0x04,0) 100900000000000000003f002008000000a0400000a040300300040001300300040000
