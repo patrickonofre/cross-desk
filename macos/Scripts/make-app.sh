@@ -5,16 +5,24 @@
 # Signing: ad-hoc (`codesign -s -`) while there is no Apple Developer
 # identity. macOS may re-ask for the TCC permissions after a rebuild because
 # the ad-hoc signature changes — re-grant in System Settings when that happens.
+# UNIVERSAL=1 builds a fat binary (arm64 + x86_64) for distribution.
 set -euo pipefail
 
 cd "$(dirname "$0")/../CrossDeskKit"
-swift build -c release --product CrossDeskApp
+
+if [ "${UNIVERSAL:-0}" = "1" ]; then
+    swift build -c release --arch arm64 --arch x86_64 --product CrossDeskApp
+    BINARY=".build/apple/Products/Release/CrossDeskApp"
+else
+    swift build -c release --product CrossDeskApp
+    BINARY=".build/release/CrossDeskApp"
+fi
 
 APP_DIR="../build/CrossDesk.app"
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS"
 
-cp .build/release/CrossDeskApp "$APP_DIR/Contents/MacOS/CrossDesk"
+cp "$BINARY" "$APP_DIR/Contents/MacOS/CrossDesk"
 
 cat > "$APP_DIR/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
