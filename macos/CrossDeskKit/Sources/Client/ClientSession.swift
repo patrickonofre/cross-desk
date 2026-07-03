@@ -32,6 +32,7 @@ public final class ClientSession: @unchecked Sendable {
     }
 
     public func stop() {
+        injector.setLocalCursorLocked(false)
         injector.releaseEverything()
         transport.stop()
         onState?(.stopped)
@@ -49,11 +50,17 @@ public final class ClientSession: @unchecked Sendable {
             switch event {
             case .connected:
                 Log.session.info("client session: connected to server")
+                // Connected and unfocused: freeze this machine's arrow (R16).
+                // ENTER unlocks it; LEAVE re-locks; disconnection below always
+                // unlocks — worst case the lock dies with the heartbeat (6 s).
+                self.injector.setLocalCursorLocked(true)
                 self.onState?(.connected(peer: "servidor"))
             case .disconnected:
                 Log.session.info("client session: disconnected — releasing held keys")
                 // Wire gone mid-chord: synthesize key-ups so nothing stays
-                // stuck (R7). The transport keeps reconnecting on its own.
+                // stuck (R7) and NEVER keep the cursor locked behind a dead
+                // link (R16). The transport keeps reconnecting on its own.
+                self.injector.setLocalCursorLocked(false)
                 self.injector.releaseEverything()
                 self.onState?(.waitingPeer)
             case let .messages(messages):

@@ -80,6 +80,21 @@ public struct ScreenTopology: Sendable {
         return (clamped, nil)
     }
 
+    /// Point on `edge` of the display containing `position` (nearest display
+    /// when in a gap) — where the cursor parks when control leaves this
+    /// machine (LEAVE): visually "gone toward the server", out of the way.
+    public func parkPoint(from position: CGPoint, at edge: EdgeSide) -> CGPoint {
+        let screen = screens.first(where: { $0.contains(position) }) ?? nearestScreen(to: position)
+        var point = position
+        switch edge {
+        case .left: point.x = screen.minX
+        case .right: point.x = screen.maxX
+        case .top: point.y = screen.minY
+        case .bottom: point.y = screen.maxY
+        }
+        return clamp(point, into: screen)
+    }
+
     // MARK: - Internals
 
     /// Non-nil when `raw` is strictly beyond `edge` of `screen` and no other

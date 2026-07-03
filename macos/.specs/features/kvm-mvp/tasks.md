@@ -65,6 +65,17 @@ Gate Fase B: **39 testes, 0 falhas** (`swift test`, 2026-07-03).
   - Bônus: multi-monitor no cliente saiu do "fora de escopo" — contenção cobre todos os monitores.
   - Prova: 63 testes (14 novos `ScreenTopologyTests`, golden vectors regenerados), build da app OK.
 
+- ☑ **T17 — Ícone da menubar sumindo com app vivo** ✅ (2026-07-03)
+  - Causa raiz: `MenuBarExtra` é a única UI (LSUIElement); macOS permite arrastar o status item pra fora da barra e **persiste** a remoção (`NSStatusItem Visible Item-0 = false` nos defaults) → ícone some com o processo vivo e não volta nem relançando.
+  - Cura: `MenuBarExtra(isInserted:)` pinado (binding rebate remoção em sessão, com log) + heal no launch (flag persistido `false` → `true` antes da cena materializar — cura instalações já afetadas).
+  - Se voltar a sumir com a beta.8+: é overflow da menubar (notch/barra cheia — sistema esconde, código não alcança); conferir com `log show --predicate 'subsystem == "dev.crossdesk.mac"' | grep menubar`.
+
+- ☑ **T18 — Trava da seta na máquina sem foco (R16)** ✅ (2026-07-03)
+  - Cliente conectado sem foco: trackpad/mouse local movia a seta livremente (seta "fantasma" vagando). Servidor em REMOTE já travava (dissociação + supressão do tap).
+  - Cura simétrica no cliente: `connected` → `CGAssociateMouseAndMouseCursorPosition(0)` (mouse físico morto, teclado livre); `ENTER` → reassocia (injeção dirige — evita incerteza dissociação×`CGEventPost`); `LEAVE` → `parkPoint` warpa seta p/ borda de retorno + trava de novo; desconexão/stop → destrava incondicional (espelho do unsuppress do servidor; pior caso heartbeat 6 s).
+  - Escapes com cliente travado: cruzar borda pelo servidor, parar servidor, cortar rede, teclado do cliente.
+  - Esconder a seta (vs. travar) continua pendência pós-MVP (APIs privadas).
+
 ## Ordem de execução sugerida
 
 T1+T2 (paralelo) → T3 → T4+T6+T7+T8+T9 (paralelo) → T5 → T10 → T11+T12 → T13 → T14 → T15 → T16 (surgiu do UAT do T15)

@@ -111,6 +111,24 @@ final class ScreenTopologyTests: XCTestCase {
         XCTAssertEqual(moved.exit!.y, 0.0)
     }
 
+    // MARK: - Parking (R16)
+
+    func testParkPointPinsToReturnEdgeKeepingOtherAxis() {
+        let park = single.parkPoint(from: CGPoint(x: 800, y: 300), at: .left)
+        XCTAssertEqual(park, CGPoint(x: 0, y: 300))
+    }
+
+    func testParkPointOnRightEdgeStaysInsideDisplay() {
+        let park = single.parkPoint(from: CGPoint(x: 100, y: 300), at: .right)
+        XCTAssertEqual(park, CGPoint(x: 1919, y: 300)) // maxX - inset
+    }
+
+    func testParkPointUsesDisplayContainingCursor() {
+        // Cursor on the external monitor parks on ITS edge, not the union's.
+        let park = dual.parkPoint(from: CGPoint(x: 2000, y: 500), at: .left)
+        XCTAssertEqual(park, CGPoint(x: 1440, y: 500))
+    }
+
     func testNilReturnEdgeNeverExits() {
         let moved = single.move(from: CGPoint(x: 3, y: 270), dx: -100, dy: 0, returnEdge: nil)
         XCTAssertNil(moved.exit)

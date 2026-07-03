@@ -53,13 +53,25 @@ public final class InputInjector: @unchecked Sendable {
     public func apply(_ message: Message) {
         switch message {
         case let .enter(x, y, edge):
+            // Focus arrived: injection drives the cursor from here — restore
+            // the normal hardware↔cursor coupling first (R16).
+            setLocalCursorLocked(false)
             returnEdge = edge
             position = ScreenTopology(screens: screens())
                 .entryPoint(edge: edge, x: CGFloat(x), y: CGFloat(y))
             postMouseMove()
         case .leave:
+            // Focus left: park the arrow on the edge it exited through and
+            // freeze it there — a brushed trackpad on this machine must not
+            // move an unfocused cursor (R16).
+            if let returnEdge {
+                position = ScreenTopology(screens: screens())
+                    .parkPoint(from: position, at: returnEdge)
+                CGWarpMouseCursorPosition(position)
+            }
             returnEdge = nil
             releaseEverything()
+            setLocalCursorLocked(true)
         case let .mouseMove(dx, dy):
             let moved = ScreenTopology(screens: screens())
                 .move(from: position, dx: CGFloat(dx), dy: CGFloat(dy), returnEdge: returnEdge)
@@ -77,6 +89,15 @@ public final class InputInjector: @unchecked Sendable {
         case .hello, .helloAck, .heartbeat, .bye, .leaveRequest:
             break // transport-level / C→S only, never reaches the injector
         }
+    }
+
+    /// Locks/unlocks this machine's PHYSICAL mouse: dissociates hardware
+    /// deltas from the cursor (R16 — unfocused machine keeps its arrow
+    /// frozen). Global system state: the caller MUST unlock on disconnect,
+    /// stop and app exit — never leave a machine locked behind a dead link.
+    public func setLocalCursorLocked(_ locked: Bool) {
+        CGAssociateMouseAndMouseCursorPosition(locked ? 0 : 1)
+        Log.session.info("injector: local cursor \(locked ? "locked" : "unlocked", privacy: .public)")
     }
 
     /// Synthetic key-up for everything still held (LEAVE/disconnect — R7).

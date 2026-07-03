@@ -21,6 +21,7 @@ Duas máquinas macOS na mesma LAN: uma servidor (dona de teclado/mouse), outra c
 - **R6** — Receber eventos e injetar via CGEventPost: movimento relativo contido na **topologia real de todos os monitores locais** (desliza em bordas, cruza para monitor adjacente), cliques, scroll, teclas (HID→CGKeyCode).
 - **R7** — Em `LEAVE` ou desconexão: key-up sintético de toda tecla logicamente pressionada (nunca deixar modificador preso).
 - **R8** — Identificar-se no HELLO só pelo nome da máquina; **geometria/resolução nunca trafegam** — cada máquina é dona da própria topologia (posições no fio são normalizadas). Cliente detecta a própria borda de retorno e envia `LEAVE_REQUEST`.
+- **R16** — Seta travada na máquina sem foco: cliente conectado e sem controle dissocia o mouse físico da seta (`CGAssociateMouseAndMouseCursorPosition`); em `LEAVE`, seta estaciona na borda de retorno antes de travar. `ENTER` destrava (injeção assume). Desconexão/stop/timeout destravam SEMPRE — máquina nunca fica presa atrás de link morto. Teclado local do cliente permanece livre.
 
 ### Transporte e segurança
 
