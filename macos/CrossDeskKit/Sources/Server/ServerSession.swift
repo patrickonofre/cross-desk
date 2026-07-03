@@ -45,6 +45,7 @@ public final class ServerSession: @unchecked Sendable {
     }
 
     public func start() throws {
+        Log.session.info("server session: starting (edge \(self.detector.side.rawValue, privacy: .public))")
         try capture.start()
         try transport.start()
         onState?(.waitingPeer)
@@ -77,9 +78,11 @@ public final class ServerSession: @unchecked Sendable {
     private func handleTransport(_ event: TransportEvent) {
         switch event {
         case let .connected(peer):
+            Log.session.info("server session: client '\(peer, privacy: .public)' connected")
             peerName = peer
             onState?(.connected(peer: peer))
         case let .disconnected(reason):
+            Log.session.info("server session: client disconnected (\(reason, privacy: .public))")
             // Never stay suppressed with a dead link — the server would be
             // uncontrollable (R4 rationale).
             if remote {
@@ -87,7 +90,6 @@ public final class ServerSession: @unchecked Sendable {
             }
             peerName = ""
             onState?(.waitingPeer)
-            _ = reason
         case .messages:
             break // v0.1: no client→server input messages
         }
@@ -113,6 +115,7 @@ public final class ServerSession: @unchecked Sendable {
         remote = true
         capture.suppressing = true
         CGAssociateMouseAndMouseCursorPosition(0)
+        Log.session.info("server session: edge crossed → REMOTE")
         transport.send([.enter(x: Float(entry.x), y: Float(entry.y))])
         onState?(.controllingRemote(peer: peerName))
     }
@@ -147,6 +150,7 @@ public final class ServerSession: @unchecked Sendable {
     }
 
     private func returnToLocal(sendLeave: Bool, exitCoordinate: CGFloat? = nil) {
+        Log.session.info("server session: → LOCAL (sendLeave \(sendLeave, privacy: .public))")
         remote = false
         capture.suppressing = false
         CGAssociateMouseAndMouseCursorPosition(1)

@@ -21,6 +21,13 @@ public enum PairingKey {
         return bytes.map { String(format: "%02x", $0) }.joined()
     }
 
+    /// Short non-reversible identifier of a PSK, safe to log. Both machines
+    /// must show the same fingerprint — a mismatch means the pairing code was
+    /// typed differently on each side.
+    public static func fingerprint(psk: Data) -> String {
+        SHA256.hash(data: psk).prefix(3).map { String(format: "%02x", $0) }.joined()
+    }
+
     /// HKDF-SHA256(code) → 32-byte PSK.
     public static func psk(fromCode code: String) -> Data {
         let key = HKDF<SHA256>.deriveKey(

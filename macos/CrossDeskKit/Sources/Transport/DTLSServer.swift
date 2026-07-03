@@ -36,14 +36,23 @@ public final class DTLSServer: @unchecked Sendable {
         }
         listener.stateUpdateHandler = { [weak self] state in
             guard let self else { return }
-            if case let .failed(error) = state {
+            switch state {
+            case .ready:
+                Log.transport.info("server: listening on udp/\(self.port, privacy: .public)")
+            case let .waiting(error):
+                Log.transport.error("server: listener waiting: \(String(describing: error), privacy: .public)")
+            case let .failed(error):
+                Log.transport.error("server: listener FAILED: \(String(describing: error), privacy: .public)")
                 self.queue.async {
                     self.onEvent?(.disconnected(reason: "listener failed: \(error)"))
                 }
+            default:
+                break
             }
         }
         self.listener = listener
         listener.start(queue: queue)
+        Log.transport.info("server: starting, psk fingerprint \(PairingKey.fingerprint(psk: self.psk), privacy: .public)")
     }
 
     public func stop() {
@@ -73,9 +82,11 @@ public final class DTLSServer: @unchecked Sendable {
 
     private func accept(_ connection: NWConnection) {
         guard self.connection == nil else {
+            Log.transport.info("server: refusing extra connection from \(String(describing: connection.endpoint), privacy: .public)")
             connection.cancel() // one client only (MVP)
             return
         }
+        Log.transport.info("server: incoming connection from \(String(describing: connection.endpoint), privacy: .public)")
         self.connection = connection
         handshakeDone = false
         lastReceived = Date()
@@ -85,8 +96,12 @@ public final class DTLSServer: @unchecked Sendable {
             self.queue.async {
                 switch state {
                 case .ready:
+                    Log.transport.info("server: DTLS handshake OK, waiting HELLO")
                     self.receiveLoop(connection)
+                case let .waiting(error):
+                    Log.transport.error("server: conn waiting: \(String(describing: error), privacy: .public)")
                 case let .failed(error):
+                    Log.transport.error("server: conn FAILED: \(String(describing: error), privacy: .public)")
                     self.peerDropped(reason: "connection failed: \(error)")
                 case .cancelled:
                     self.peerDropped(reason: "connection cancelled")
@@ -142,6 +157,7 @@ public final class DTLSServer: @unchecked Sendable {
                 )
                 if !handshakeDone {
                     handshakeDone = true
+                    Log.transport.info("server: HELLO from '\(name, privacy: .public)' v\(clientVersion, privacy: .public) → connected (v\(negotiated, privacy: .public))")
                     startHeartbeat()
                     onEvent?(.connected(peerName: name))
                 }
@@ -179,6 +195,7 @@ public final class DTLSServer: @unchecked Sendable {
     }
 
     private func peerDropped(reason: String) {
+        Log.transport.info("server: peer dropped — \(reason, privacy: .public)")
         let wasConnected = handshakeDone || connection != nil
         teardownConnection(notify: false)
         if wasConnected {

@@ -84,8 +84,10 @@ public final class InputCapture: @unchecked Sendable {
             userInfo: userInfo
         ) else {
             Unmanaged<InputCapture>.fromOpaque(userInfo).release()
+            Log.capture.error("tap creation FAILED — Input Monitoring permission missing?")
             throw InputCaptureError.tapCreationFailed
         }
+        Log.capture.info("event tap created")
         self.tap = tap
 
         let thread = Thread { [weak self] in
@@ -123,6 +125,7 @@ public final class InputCapture: @unchecked Sendable {
         switch type {
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
             // macOS silently disables slow taps; re-enable immediately (design.md).
+            Log.capture.error("tap disabled by system (\(type.rawValue, privacy: .public)) — re-enabling")
             if let tap {
                 CGEvent.tapEnable(tap: tap, enable: true)
             }

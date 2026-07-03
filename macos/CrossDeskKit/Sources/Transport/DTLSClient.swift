@@ -61,6 +61,7 @@ public final class DTLSClient: @unchecked Sendable {
 
     private func connect() {
         guard !stopped else { return }
+        Log.transport.info("client: connecting to \(self.host, privacy: .public):\(self.port, privacy: .public), psk fingerprint \(PairingKey.fingerprint(psk: self.psk), privacy: .public)")
         let connection = NWConnection(
             host: NWEndpoint.Host(host),
             port: NWEndpoint.Port(rawValue: port)!,
@@ -75,6 +76,7 @@ public final class DTLSClient: @unchecked Sendable {
                 guard connection === self.connection else { return }
                 switch state {
                 case .ready:
+                    Log.transport.info("client: DTLS handshake OK → sending HELLO")
                     self.lastReceived = Date()
                     // DTLS is up; introduce ourselves (PROTOCOL.md §3).
                     connection.send(
@@ -85,7 +87,12 @@ public final class DTLSClient: @unchecked Sendable {
                         completion: .idempotent
                     )
                     self.receiveLoop(connection)
+                case let .waiting(error):
+                    // Typical here: server unreachable, firewall dropping UDP,
+                    // wrong IP. The handshake timeout will recycle the attempt.
+                    Log.transport.error("client: waiting — \(String(describing: error), privacy: .public)")
                 case let .failed(error):
+                    Log.transport.error("client: conn FAILED: \(String(describing: error), privacy: .public)")
                     self.connectionLost(reason: "connection failed: \(error)")
                 case .cancelled:
                     break // triggered by our own teardown
@@ -132,6 +139,7 @@ public final class DTLSClient: @unchecked Sendable {
             case .helloAck:
                 if !handshakeDone {
                     handshakeDone = true
+                    Log.transport.info("client: HELLO_ACK received → connected")
                     reconnectDelay = TransportTiming.reconnectMinDelay
                     startHeartbeat()
                     onEvent?(.connected(peerName: ""))
@@ -170,6 +178,7 @@ public final class DTLSClient: @unchecked Sendable {
     }
 
     private func connectionLost(reason: String) {
+        Log.transport.info("client: connection lost — \(reason, privacy: .public)")
         let wasConnected = handshakeDone
         teardown()
         if wasConnected {
@@ -181,6 +190,7 @@ public final class DTLSClient: @unchecked Sendable {
     private func scheduleReconnect() {
         guard !stopped else { return }
         let delay = reconnectDelay
+        Log.transport.info("client: retrying in \(Int(delay), privacy: .public)s")
         reconnectDelay = min(reconnectDelay * 2, TransportTiming.reconnectMaxDelay)
         queue.asyncAfter(deadline: .now() + delay) { [weak self] in
             self?.connect()

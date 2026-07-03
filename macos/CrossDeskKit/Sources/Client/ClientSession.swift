@@ -42,8 +42,10 @@ public final class ClientSession: @unchecked Sendable {
             guard let self else { return }
             switch event {
             case .connected:
+                Log.session.info("client session: connected to server")
                 self.onState?(.connected(peer: "servidor"))
             case .disconnected:
+                Log.session.info("client session: disconnected — releasing held keys")
                 // Wire gone mid-chord: synthesize key-ups so nothing stays
                 // stuck (R7). The transport keeps reconnecting on its own.
                 self.injector.releaseEverything()
