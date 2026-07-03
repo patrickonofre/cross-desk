@@ -57,8 +57,10 @@ final class AppState: ObservableObject {
     private func start() {
         saveConfig()
         refreshPermissions()
+        Log.app.info("start: role \(self.config.role.rawValue, privacy: .public), inputMonitoring \(self.inputMonitoringGranted, privacy: .public), accessibility \(self.accessibilityGranted, privacy: .public)")
         guard !permissionNeededForCurrentRole else {
-            sessionState = .error("Permissão do sistema pendente")
+            Log.app.error("start blocked: permission missing for role \(self.config.role.rawValue, privacy: .public) — if it was just granted, the app must be relaunched (per-process TCC cache)")
+            sessionState = .error("Permissão pendente — reinicie o app se acabou de conceder")
             return
         }
 
@@ -79,7 +81,8 @@ final class AppState: ObservableObject {
                 serverSession = session
                 running = true
             } catch {
-                sessionState = .error("Falha ao iniciar captura: \(error)")
+                Log.app.error("start failed: capture start threw \(String(describing: error), privacy: .public)")
+                sessionState = .error("Falha ao iniciar captura — reinicie o app")
                 refreshPermissions()
             }
         case .client:
@@ -98,6 +101,18 @@ final class AppState: ObservableObject {
             clientSession = session
             running = true
         }
+    }
+
+    /// Accessibility/Input Monitoring grants only take effect on a fresh
+    /// process (per-process TCC cache) — relaunch instead of asking the user
+    /// to quit and reopen manually.
+    func relaunch() {
+        let path = Bundle.main.bundlePath
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        task.arguments = ["-n", path]
+        try? task.run()
+        NSApplication.shared.terminate(nil)
     }
 
     private func stop() {

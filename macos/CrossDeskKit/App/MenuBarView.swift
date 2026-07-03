@@ -164,10 +164,14 @@ struct MenuBarView: View {
                 )
             }
             if appState.permissionNeededForCurrentRole {
-                Text("Concedeu e continua ⚠️? Remova o CrossDesk da lista no ajuste (botão −), adicione de novo e reabra o app.")
+                Text("Concedeu no ajuste? O macOS só aplica após reiniciar o app:")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                Button("Reiniciar app") {
+                    appState.relaunch()
+                }
+                .font(.caption)
             }
         }
     }
