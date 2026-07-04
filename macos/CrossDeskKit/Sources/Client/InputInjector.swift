@@ -18,6 +18,14 @@ public final class InputInjector: @unchecked Sendable {
     /// every outward move at the edge until control actually returns.
     public var onExitEdge: (@Sendable (CGPoint) -> Void)?
 
+    /// Focus arrived (ENTER): injection now drives the cursor — the session
+    /// releases the cursor lock (R18).
+    public var onFocusGained: (@Sendable () -> Void)?
+
+    /// Focus left (LEAVE): carries the park point on the return edge. The
+    /// session freezes the arrow there via the sentinel (R18).
+    public var onFocusLost: (@Sendable (CGPoint) -> Void)?
+
     private var position = CGPoint.zero
     private var returnEdge: EdgeSide?
     private var pressedKeys = PressedKeys()
@@ -46,6 +54,10 @@ public final class InputInjector: @unchecked Sendable {
     /// injected as a closure for testability and display reconfiguration.
     public init(screens: @escaping @Sendable () -> [CGRect] = Displays.activeBounds) {
         self.screens = screens
+        // Injected events otherwise suppress local hardware events for ~250 ms
+        // (R21): brushing the client's own trackpad during REMOTE would freeze
+        // the incoming stream. Zero it so injection and local input coexist.
+        source?.localEventsSuppressionInterval = 0
     }
 
     // MARK: - Message application
@@ -53,25 +65,26 @@ public final class InputInjector: @unchecked Sendable {
     public func apply(_ message: Message) {
         switch message {
         case let .enter(x, y, edge):
-            // Focus arrived: injection drives the cursor from here — restore
-            // the normal hardware↔cursor coupling first (R16).
-            setLocalCursorLocked(false)
+            // Focus arrived: injection drives the cursor from here. The session
+            // releases the sentinel (re-couples hardware↔cursor, shows the
+            // arrow) before we position it (R16/R18).
+            onFocusGained?()
             returnEdge = edge
             position = ScreenTopology(screens: screens())
                 .entryPoint(edge: edge, x: CGFloat(x), y: CGFloat(y))
             postMouseMove()
         case .leave:
-            // Focus left: park the arrow on the edge it exited through and
-            // freeze it there — a brushed trackpad on this machine must not
-            // move an unfocused cursor (R16).
-            if let returnEdge {
-                position = ScreenTopology(screens: screens())
-                    .parkPoint(from: position, at: returnEdge)
-                CGWarpMouseCursorPosition(position)
+            // Focus left: compute the park point on the return edge, drop held
+            // keys, and hand the point to the session — the sentinel warps
+            // there, freezes and (optionally) hides the arrow, and runs the
+            // drift watchdog. A brushed trackpad must not move it (R16/R18).
+            let park = returnEdge.map { edge in
+                ScreenTopology(screens: screens()).parkPoint(from: position, at: edge)
             }
+            if let park { position = park }
             returnEdge = nil
             releaseEverything()
-            setLocalCursorLocked(true)
+            onFocusLost?(park ?? position)
         case let .mouseMove(dx, dy):
             let moved = ScreenTopology(screens: screens())
                 .move(from: position, dx: CGFloat(dx), dy: CGFloat(dy), returnEdge: returnEdge)
@@ -84,20 +97,13 @@ public final class InputInjector: @unchecked Sendable {
             postMouseButton(button: button, isDown: pressed)
         case let .scroll(dx, dy):
             postScroll(dx: Double(dx), dy: Double(dy))
+        case let .scrollContinuous(dx, dy, phase, momentum):
+            postScrollContinuous(dx: Double(dx), dy: Double(dy), phase: phase, momentum: momentum)
         case let .key(hidUsage, pressed):
             postKey(hidUsage: hidUsage, isDown: pressed)
         case .hello, .helloAck, .heartbeat, .bye, .leaveRequest:
             break // transport-level / C→S only, never reaches the injector
         }
-    }
-
-    /// Locks/unlocks this machine's PHYSICAL mouse: dissociates hardware
-    /// deltas from the cursor (R16 — unfocused machine keeps its arrow
-    /// frozen). Global system state: the caller MUST unlock on disconnect,
-    /// stop and app exit — never leave a machine locked behind a dead link.
-    public func setLocalCursorLocked(_ locked: Bool) {
-        CGAssociateMouseAndMouseCursorPosition(locked ? 0 : 1)
-        Log.session.info("injector: local cursor \(locked ? "locked" : "unlocked", privacy: .public)")
     }
 
     /// Synthetic key-up for everything still held (LEAVE/disconnect — R7).
@@ -184,20 +190,73 @@ public final class InputInjector: @unchecked Sendable {
         event?.post(tap: .cghidEventTap)
     }
 
-    private func postKey(hidUsage: UInt16, isDown: Bool) {
-        guard let keycode = HIDKeycodes.macKeycode(forHIDUsage: hidUsage) else { return }
-        pressedKeys.handle(hidUsage: hidUsage, isDown: isDown)
-        updateFlags(hidUsage: hidUsage, isDown: isDown)
-        post(keyCode: keycode, isDown: isDown)
+    /// Trackpad scroll (R20): pixel units + gesture/momentum phase so apps show
+    /// smooth scrolling and momentum, not line-step jumps. Phases are replayed
+    /// from the origin (never synthesized here).
+    private func postScrollContinuous(
+        dx: Double, dy: Double, phase: ScrollPhase, momentum: MomentumPhase
+    ) {
+        let event = CGEvent(
+            scrollWheelEvent2Source: source, units: .pixel,
+            wheelCount: 2, wheel1: Self.clampWheel(dy), wheel2: Self.clampWheel(dx), wheel3: 0
+        )
+        // Exact pixel deltas (the Int32 wheels above are a coarse fallback).
+        event?.setDoubleValueField(.scrollWheelEventPointDeltaAxis1, value: dy)
+        event?.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: dx)
+        event?.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+        event?.setIntegerValueField(.scrollWheelEventScrollPhase, value: Self.cgScrollPhase(phase))
+        event?.setIntegerValueField(.scrollWheelEventMomentumPhase, value: Self.cgMomentumPhase(momentum))
+        event?.flags = flags
+        event?.post(tap: .cghidEventTap)
     }
 
-    private func post(keyCode: UInt16, isDown: Bool) {
+    private static func clampWheel(_ v: Double) -> Int32 {
+        guard v.isFinite else { return 0 }
+        return Int32(max(-30000, min(30000, v.rounded())))
+    }
+
+    /// Neutral wire phase → macOS `CGScrollPhase` bit value.
+    static func cgScrollPhase(_ p: ScrollPhase) -> Int64 {
+        switch p {
+        case .none: 0
+        case .began: 1
+        case .changed: 2
+        case .ended: 4
+        case .cancelled: 8
+        }
+    }
+
+    /// Neutral wire momentum → macOS `CGMomentumScrollPhase` value.
+    static func cgMomentumPhase(_ m: MomentumPhase) -> Int64 {
+        switch m {
+        case .none: 0
+        case .began: 1
+        case .changed: 2
+        case .ended: 3
+        }
+    }
+
+    private func postKey(hidUsage: UInt16, isDown: Bool) {
+        guard let keycode = HIDKeycodes.macKeycode(forHIDUsage: hidUsage) else { return }
+        // A key-down for a key already logically held is an autorepeat — the
+        // OS on the server side generated it while the user held the key (R22).
+        // Derived here, so nothing extra crosses the wire.
+        let isRepeat = isDown && pressedKeys.currentlyPressed.contains(hidUsage)
+        pressedKeys.handle(hidUsage: hidUsage, isDown: isDown)
+        updateFlags(hidUsage: hidUsage, isDown: isDown)
+        post(keyCode: keycode, isDown: isDown, isRepeat: isRepeat)
+    }
+
+    private func post(keyCode: UInt16, isDown: Bool, isRepeat: Bool = false) {
         let event = CGEvent(
             keyboardEventSource: source, virtualKey: CGKeyCode(keyCode), keyDown: isDown
         )
         // Synthesized events carry their own modifier state; without this,
         // ⌘C arrives as a bare C.
         event?.flags = flags
+        if isRepeat {
+            event?.setIntegerValueField(.keyboardEventAutorepeat, value: 1)
+        }
         event?.post(tap: .cghidEventTap)
     }
 

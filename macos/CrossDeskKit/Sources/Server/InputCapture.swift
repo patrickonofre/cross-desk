@@ -7,7 +7,10 @@ public enum CapturedEvent: Sendable {
     /// plus the current global location (CG coordinates, y-down).
     case mouseMoved(dx: Double, dy: Double, location: CGPoint)
     case mouseButton(button: UInt8, isDown: Bool)
+    /// Discrete wheel (line steps).
     case scroll(dx: Double, dy: Double)
+    /// Continuous trackpad scroll: pixel deltas + gesture/momentum phase (R20).
+    case scrollContinuous(dx: Double, dy: Double, phase: ScrollPhase, momentum: MomentumPhase)
     /// macOS virtual keycode. Modifier transitions arrive here too (derived
     /// from flagsChanged).
     case key(macKeycode: UInt16, isDown: Bool)
@@ -104,6 +107,16 @@ public final class InputCapture: @unchecked Sendable {
         thread.start()
     }
 
+    /// Force the tap back on after a system transition (R19). A wake can leave
+    /// the tap silently disabled — same failure class as `tapDisabledByTimeout`,
+    /// which is handled inline, but that path only fires if an event arrives.
+    public func reassertEnabled() {
+        if let tap {
+            CGEvent.tapEnable(tap: tap, enable: true)
+            Log.capture.info("event tap re-enabled after system transition")
+        }
+    }
+
     public func stop() {
         if let tap {
             CGEvent.tapEnable(tap: tap, enable: false)
@@ -149,10 +162,22 @@ public final class InputCapture: @unchecked Sendable {
         case .otherMouseUp:
             onEvent?(.mouseButton(button: buttonNumber(event), isDown: false))
         case .scrollWheel:
-            onEvent?(.scroll(
-                dx: event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2),
-                dy: event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1)
-            ))
+            // Trackpads emit continuous events (pixel deltas + phases); a
+            // physical wheel emits discrete line steps. Keep them on separate
+            // wire channels so the client injects with the right units (R20).
+            if event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0 {
+                onEvent?(.scrollContinuous(
+                    dx: event.getDoubleValueField(.scrollWheelEventPointDeltaAxis2),
+                    dy: event.getDoubleValueField(.scrollWheelEventPointDeltaAxis1),
+                    phase: Self.scrollPhase(event.getIntegerValueField(.scrollWheelEventScrollPhase)),
+                    momentum: Self.momentumPhase(event.getIntegerValueField(.scrollWheelEventMomentumPhase))
+                ))
+            } else {
+                onEvent?(.scroll(
+                    dx: event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2),
+                    dy: event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1)
+                ))
+            }
         case .keyDown, .keyUp:
             onEvent?(.key(
                 macKeycode: UInt16(event.getIntegerValueField(.keyboardEventKeycode)),
@@ -187,6 +212,28 @@ public final class InputCapture: @unchecked Sendable {
         UInt8(clamping: event.getIntegerValueField(.mouseEventButtonNumber) + 1)
     }
 
+    /// macOS `CGScrollPhase` bit values → neutral wire phase. `mayBegin`(128)
+    /// and unknown collapse to `.none`.
+    static func scrollPhase(_ raw: Int64) -> ScrollPhase {
+        switch raw {
+        case 1: .began      // kCGScrollPhaseBegan
+        case 2: .changed    // kCGScrollPhaseChanged
+        case 4: .ended      // kCGScrollPhaseEnded
+        case 8: .cancelled  // kCGScrollPhaseCancelled
+        default: .none
+        }
+    }
+
+    /// macOS `CGMomentumScrollPhase` (0…3) → neutral wire momentum phase.
+    static func momentumPhase(_ raw: Int64) -> MomentumPhase {
+        switch raw {
+        case 1: .began     // kCGMomentumScrollPhaseBegin
+        case 2: .changed   // kCGMomentumScrollPhaseContinue
+        case 3: .ended     // kCGMomentumScrollPhaseEnd
+        default: .none
+        }
+    }
+
     static func modifierMask(forMacKeycode keycode: UInt16) -> CGEventFlags? {
         switch keycode {
         case 0x38, 0x3C: .maskShift
@@ -196,13 +243,5 @@ public final class InputCapture: @unchecked Sendable {
         case 0x39: .maskAlphaShift // CapsLock
         default: nil
         }
-    }
-}
-
-extension NSLock {
-    fileprivate func withLock<T>(_ body: () -> T) -> T {
-        lock()
-        defer { unlock() }
-        return body()
     }
 }

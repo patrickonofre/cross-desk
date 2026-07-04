@@ -28,6 +28,8 @@ public enum Message: Equatable, Sendable {
     case mouseMove(dx: Float, dy: Float)
     case mouseButton(button: UInt8, pressed: Bool)
     case scroll(dx: Float, dy: Float)
+    /// High-fidelity trackpad scroll: pixel deltas + gesture/momentum phase (R20).
+    case scrollContinuous(dx: Float, dy: Float, phase: ScrollPhase, momentum: MomentumPhase)
     case key(hidUsage: UInt16, pressed: Bool)
 
     enum WireType: UInt8 {
@@ -41,6 +43,7 @@ public enum Message: Equatable, Sendable {
         case mouseMove = 0x20
         case mouseButton = 0x21
         case scroll = 0x22
+        case scrollContinuous = 0x23
         case key = 0x30
     }
 }
@@ -96,6 +99,12 @@ extension Message {
             payload.appendLE(dx.bitPattern)
             payload.appendLE(dy.bitPattern)
             return (.scroll, payload)
+        case let .scrollContinuous(dx, dy, phase, momentum):
+            payload.appendLE(dx.bitPattern)
+            payload.appendLE(dy.bitPattern)
+            payload.append(phase.rawValue)
+            payload.append(momentum.rawValue)
+            return (.scrollContinuous, payload)
         case let .key(hidUsage, pressed):
             payload.appendLE(hidUsage)
             payload.append(pressed ? 1 : 0)
@@ -163,6 +172,17 @@ extension Message {
         case .scroll:
             guard let dx = try? reader.f32(), let dy = try? reader.f32() else { throw invalid() }
             return .scroll(dx: dx, dy: dy)
+        case .scrollContinuous:
+            guard let dx = try? reader.f32(), let dy = try? reader.f32(),
+                  let phaseByte = try? reader.u8(), let momentumByte = try? reader.u8()
+            else { throw invalid() }
+            // Unknown phase values decode to .none rather than throwing — a future
+            // phase constant must not poison the whole datagram (forward-compat).
+            return .scrollContinuous(
+                dx: dx, dy: dy,
+                phase: ScrollPhase(rawValue: phaseByte) ?? .none,
+                momentum: MomentumPhase(rawValue: momentumByte) ?? .none
+            )
         case .key:
             guard let usage = try? reader.u16(), let pressed = try? reader.u8() else { throw invalid() }
             return .key(hidUsage: usage, pressed: pressed != 0)

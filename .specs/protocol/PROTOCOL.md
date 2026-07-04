@@ -41,7 +41,8 @@ Cada datagrama DTLS carrega **uma ou mais mensagens** concatenadas:
 | 0x12 | LEAVE_REQUEST | C→S | `x f32` · `y f32` (posição normalizada de saída) — cursor do cliente cruzou a borda de retorno; servidor responde com LEAVE. Pode repetir até o LEAVE chegar (perda UDP) — servidor DEVE tratar como idempotente |
 | 0x20 | MOUSE_MOVE | S→C | `dx f32` · `dy f32` (deltas relativos, px) |
 | 0x21 | MOUSE_BUTTON | S→C | `button u8` (1=esq, 2=dir, 3=meio, 4+=extra) · `pressed u8` (0/1) |
-| 0x22 | SCROLL | S→C | `dx f32` · `dy f32` (linhas; positivo = direita/baixo) |
+| 0x22 | SCROLL | S→C | `dx f32` · `dy f32` (linhas; positivo = direita/baixo) — roda física discreta |
+| 0x23 | SCROLL_CONTINUOUS | S→C | `dx f32` · `dy f32` (pixels; positivo = direita/baixo) · `phase u8` (0=none 1=began 2=changed 3=ended 4=cancelled) · `momentum u8` (0=none 1=began 2=changed 3=ended) — scroll de trackpad de alta fidelidade; fases repassadas da origem (momentum não é sintetizado) |
 | 0x30 | KEY | S→C | `hid_usage u16` (USB HID Usage ID, página 0x07) · `pressed u8` (0/1) |
 | 0x40 | CLIPBOARD | ambas | reservado (Fase 4) |
 
@@ -59,6 +60,7 @@ Cada datagrama DTLS carrega **uma ou mais mensagens** concatenadas:
 
 - **Cada máquina é dona da própria geometria de telas** — resolução e layout de monitores NUNCA trafegam. Posições no fio são sempre normalizadas 0.0–1.0.
 - MOUSE_MOVE são **deltas relativos**; o cliente é dono da posição absoluta do seu cursor, contido na topologia real dos seus monitores (desliza em bordas, cruza para monitores adjacentes).
+- Scroll tem dois canais: **SCROLL (0x22)** para roda física (linhas, passos discretos) e **SCROLL_CONTINUOUS (0x23)** para trackpad (pixels + fase de gesto + fase de momentum). O servidor classifica na captura (evento contínuo vs. discreto) e o cliente injeta com a unidade correspondente. Fases de momentum são geradas pela origem e apenas repassadas — o cliente não sintetiza inércia.
 - ENTER carrega posição normalizada (sobre o bounding box da união das telas do cliente) + a borda de entrada, para o cursor "nascer" no ponto correspondente. A borda de entrada é também a borda de retorno.
 - **A borda de retorno é detectada no CLIENTE** (dono da verdade sobre a posição do seu cursor): ao cruzar a borda externa de retorno, envia LEAVE_REQUEST com a posição normalizada de saída; o servidor reposiciona seu cursor físico e responde LEAVE. LEAVE_REQUEST pode se repetir a cada movimento adicional "para fora" enquanto o LEAVE não chega — retry natural sobre UDP; servidor idempotente (ignora quando já está em LOCAL).
 - Após LEAVE, cliente DEVE soltar (key-up sintético) toda tecla que estiver logicamente pressionada — evita modificador preso.
@@ -75,3 +77,4 @@ Cada datagrama DTLS carrega **uma ou mais mensagens** concatenadas:
 - v0.1 (2026-07-03): draft inicial.
 - v0.1 (2026-07-03): auth trocada de certs+TOFU para DTLS-PSK com código de pareamento gerado (resultado do spike T1 — evita geração de certificado, UX mais simples).
 - v0.1 (2026-07-03): geometria independente por máquina — ENTER ganha `edge u8`; nova mensagem LEAVE_REQUEST (0x12, C→S); borda de retorno detectada no cliente (antes: cursor virtual simulado no servidor — causava drift quando as resoluções diferiam). Golden vectors regenerados.
+- v0.1 (2026-07-03): nova mensagem SCROLL_CONTINUOUS (0x23, S→C) para scroll de trackpad de alta fidelidade (pixels + fases). `proto_version` inalterado (=1): mensagem de tipo novo é ignorável por decoders antigos (§2), então é adição compatível. Golden vectors acrescidos.

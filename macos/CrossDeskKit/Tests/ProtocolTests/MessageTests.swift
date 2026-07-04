@@ -18,6 +18,9 @@ final class MessageTests: XCTestCase {
         ("mouse_move", .mouseMove(dx: 10.0, dy: -3.5), "20080000002041000060c0"),
         ("mouse_button", .mouseButton(button: 1, pressed: true), "2102000101"),
         ("scroll", .scroll(dx: 0.0, dy: 1.0), "220800000000000000803f"),
+        ("scroll_continuous",
+         .scrollContinuous(dx: 0.0, dy: 2.0, phase: .changed, momentum: .none),
+         "230a0000000000000000400200"),
         ("key", .key(hidUsage: 0x0004, pressed: true), "300300040001"),
     ]
 
@@ -51,10 +54,30 @@ final class MessageTests: XCTestCase {
             .mouseMove(dx: -1024.5, dy: 0.001),
             .mouseButton(button: 4, pressed: false),
             .scroll(dx: -3.0, dy: 42.25),
+            .scrollContinuous(dx: -12.5, dy: 3.0, phase: .began, momentum: .none),
+            .scrollContinuous(dx: 0.0, dy: -8.0, phase: .ended, momentum: .began),
             .key(hidUsage: 0xE3, pressed: false),
         ]
         for message in messages {
             XCTAssertEqual(try Message.decodeAll(message.encoded()), [message])
+        }
+    }
+
+    func testScrollContinuousUnknownPhaseDecodesToNone() throws {
+        // dx=0 dy=0, phase byte 0x63 (undefined), momentum byte 0x63 (undefined).
+        let data = Data(hexString: "230a00" + "00000000" + "00000000" + "63" + "63")!
+        XCTAssertEqual(
+            try Message.decodeAll(data),
+            [.scrollContinuous(dx: 0, dy: 0, phase: .none, momentum: .none)],
+            "an unknown phase value must not poison the datagram"
+        )
+    }
+
+    func testScrollContinuousTruncatedThrows() {
+        // Claims 10 payload bytes, carries only the 8 delta bytes (phases missing).
+        let data = Data(hexString: "230a00" + "00000000" + "00000040")!
+        XCTAssertThrowsError(try Message.decodeAll(data)) { error in
+            XCTAssertEqual(error as? ProtocolError, .truncated)
         }
     }
 

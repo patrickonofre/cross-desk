@@ -14,6 +14,7 @@ leave_request LEAVE_REQUEST(x=0.0, y=0.5)                   12080000000000000000
 mouse_move    MOUSE_MOVE(dx=10.0, dy=-3.5)                  20080000002041000060c0
 mouse_button  MOUSE_BUTTON(button=1, pressed=1)             2102000101
 scroll        SCROLL(dx=0.0, dy=1.0)                        220800000000000000803f
+scroll_cont   SCROLL_CONTINUOUS(dx=0.0, dy=2.0, phase=2/changed, momentum=0/none) 230a0000000000000000400200
 key           KEY(hid_usage=0x0004, pressed=1)              300300040001
 
 # Compound datagram: ENTER + MOUSE_MOVE + KEY-down + KEY-up concatenated

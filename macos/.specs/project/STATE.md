@@ -18,17 +18,25 @@
 
 - **2026-07-03 — Geometria independente por máquina (T16)**: borda de retorno detectada no CLIENTE (`LEAVE_REQUEST` 0x12), `VirtualCursor` do servidor removido. Motivo: simulação server-side driftava com resoluções diferentes (cursor "se perdia" no UAT). Cliente agora contém o cursor em TODOS os seus monitores (`ScreenTopology`). Resolução continua fora do fio (R8 preservado).
 
+- **2026-07-03 — Ocultação de cursor via API privada aprovada (input-polish R17)**: `SetsCursorInBackground` (`CGSSetConnectionProperty` via `dlsym`) + `CGDisplayHideCursor` — mesma técnica de Deskflow/Barrier. Provado no spike T19 (macOS 26: símbolos resolvem, CGError=0). Fallback: seta parada-visível (warp-offscreen NÃO serve — clampa). Símbolos SEMPRE via `dlsym`, nunca linkados. App já é não-sandbox (tap com supressão), então API privada não muda o status de distribuição.
+- **2026-07-03 — Trava de cursor não confia só na dissociação (input-polish R18/R19)**: `CGAssociateMouseAndMouseCursorPosition(0)` é estado global volátil (cai em sleep/wake). Defesa em camadas: servidor re-warpa a cada move capturado; cliente tem watchdog (`CursorSentinel`, poll 250 ms, sem TCC novo); ambos re-aplicam em wake/screensaver/display via `SystemStateObserver`. Padrão confirmado nos dois pares maduros (Deskflow/lan-mouse re-warpam continuamente).
+
 ## Pendências
 
 - [x] Golden vectors → `.specs/protocol/vectors/v0_1.txt` (provados por teste).
 - [ ] Spike T2 (CGEventPost fora da main thread + Esc em REMOTE) — valida na prática durante T15/UAT.
 - [ ] Pairing code em JSON plano → migrar para Keychain pós-MVP.
 - [x] ~~Assinatura ad-hoc: TCC re-pedindo após rebuild~~ — RESOLVIDO (beta.3): identidade self-signed "CrossDesk Dev" no keychain da máquina de build, make-app.sh auto-detecta (fallback ad-hoc). Cert Apple Developer real continua desejável p/ notarização (elimina o passo do xattr).
-- [ ] Cursor do servidor fica visível parado na borda durante REMOTE (esconder cursor exige APIs privadas/hacks — avaliar pós-MVP).
+- [ ] **input-polish — código completo (T19–T27), só falta UAT (T28)** (2026-07-03). 99 testes verdes, app assina OK. Falta rodar em 2 macs: invisibilidade visual, sleep-survival (`swift run conceal-spike --sleep-test`), momentum em apps, decisão do coalescing (dormente), latência p95. Detalhes em `.specs/features/input-polish/tasks.md` T28.
+  - ~~Cursor visível parado na borda~~ → R17 (`CursorConcealer`, API privada `SetsCursorInBackground` provada no spike T19).
+  - ~~Seta anda após standby/wake~~ → R18 (`CursorSentinel` watchdog) + R19 (`SystemStateObserver` reassert).
 
 ## Lições (cont.)
 
 - Simular a posição do cursor remoto no servidor (duas contabilidades da mesma verdade) drifta assim que as resoluções diferem — quem injeta o cursor é a única fonte de verdade da posição dele.
+- Adicionar campo não-opcional a um `Codable` persistido (config.json) quebra o load de configs antigos (falta a chave → decode throws) — `ConfigStore` trata throw como "corrompido". Cura: `init(from:)` com `decodeIfPresent ?? default` (tolerante a chaves ausentes, mantém throw só p/ JSON inválido). Feito no `concealCursor`.
+- `NSEvent.addGlobalMonitorForEvents` exige **Accessibility**, não Input Monitoring — por isso o watchdog do cliente (que só tem Accessibility p/ injetar) usa poll de `CGEvent(source: nil)?.location` a 4 Hz em vez de um monitor global: zero prompt de TCC novo.
+- Notificações de wake/sessão (`NSWorkspace.didWake…`) chegam no `NSWorkspace.shared.notificationCenter`, **não** no `.default` — assinar no center errado = observer que nunca dispara.
 - App menubar-only (LSUIElement): usuário pode arrastar o status item pra fora e o macOS PERSISTE a remoção → app roda sem UI alcançável para sempre. `MenuBarExtra(isInserted:)` pinado + heal do flag no launch (T17).
 
 - `NWConnection` presa em `.preparing` (porta morta) nunca vira `.failed` sozinha — timeout de handshake é obrigatório em UDP/DTLS.

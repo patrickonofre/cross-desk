@@ -11,6 +11,8 @@ struct MenuBarView: View {
             rolePicker
             roleFields
             Divider()
+            optionsSection
+            Divider()
             permissionsSection
             Divider()
             footer
@@ -163,6 +165,18 @@ struct MenuBarView: View {
             }
             .buttonStyle(.borderless)
             .help("Copiar")
+        }
+    }
+
+    private var optionsSection: some View {
+        Toggle(isOn: $appState.config.concealCursor) {
+            Text("Esconder o cursor na máquina sem foco")
+                .font(.caption)
+        }
+        .toggleStyle(.checkbox)
+        .disabled(appState.running)
+        .onChange(of: appState.config.concealCursor) {
+            appState.saveConfig()
         }
     }
 

@@ -19,9 +19,17 @@ public final class ServerSession: @unchecked Sendable {
     private let transport: DTLSServer
     private let detector: EdgeDetector
     private let screens: @Sendable () -> [CGRect]
+    private let concealer: CursorConcealer
+    private let observer: SystemStateObserver
+    private let metrics: InputMetrics
+    private let conceal: Bool
 
     private var remote = false
     private var exitScreen = CGRect.zero
+    /// Where the physical cursor is pinned while REMOTE — the crossing point.
+    /// Re-warped on every captured move so a brushed trackpad can't drift the
+    /// frozen arrow (R18).
+    private var parkPoint = CGPoint.zero
     private var escape = EmergencyEscape()
     private var peerName = ""
 
@@ -32,13 +40,21 @@ public final class ServerSession: @unchecked Sendable {
         port: UInt16,
         pairingCode: String,
         edgeSide: EdgeSide,
+        conceal: Bool = true,
         capture: InputCapture = InputCapture(),
+        concealer: CursorConcealer = CursorConcealer(),
+        observer: SystemStateObserver = SystemStateObserver(),
+        metrics: InputMetrics = InputMetrics(),
         screens: @escaping @Sendable () -> [CGRect] = Displays.activeBounds
     ) {
         self.capture = capture
         self.transport = DTLSServer(port: port, psk: PairingKey.psk(fromCode: pairingCode))
         self.detector = EdgeDetector(side: edgeSide)
         self.screens = screens
+        self.concealer = concealer
+        self.observer = observer
+        self.metrics = metrics
+        self.conceal = conceal
         wire()
     }
 
@@ -46,6 +62,7 @@ public final class ServerSession: @unchecked Sendable {
         Log.session.info("server session: starting (edge \(self.detector.side.rawValue, privacy: .public))")
         try capture.start()
         try transport.start()
+        observer.start()
         onState?(.waitingPeer)
     }
 
@@ -54,8 +71,10 @@ public final class ServerSession: @unchecked Sendable {
             if remote {
                 returnToLocal(sendLeave: true)
             }
+            observer.stop()
             capture.stop()
             transport.stop()
+            metrics.logSummary(context: "server")
             onState?(.stopped)
         }
     }
@@ -71,6 +90,23 @@ public final class ServerSession: @unchecked Sendable {
             guard let self else { return }
             self.queue.async { self.handleTransport(event) }
         }
+        observer.onReassert = { [weak self] _ in
+            guard let self else { return }
+            self.queue.async { self.reassertRemoteLock() }
+        }
+    }
+
+    /// System woke / screensaver ended / displays changed while REMOTE: the tap
+    /// and dissociation can lapse. Re-apply suppression, dissociation, the tap,
+    /// and the hide so control is not silently lost (R19).
+    private func reassertRemoteLock() {
+        guard remote else { return }
+        metrics.bump(.reasserts)
+        capture.suppressing = true
+        CGAssociateMouseAndMouseCursorPosition(0)
+        capture.reassertEnabled()
+        if conceal { concealer.reassert() }
+        Log.session.info("server session: re-asserted REMOTE lock after system transition")
     }
 
     private func handleTransport(_ event: TransportEvent) {
@@ -120,9 +156,11 @@ public final class ServerSession: @unchecked Sendable {
         // Crossed: freeze the local cursor and start streaming to the client.
         let screen = allScreens.first { $0.insetBy(dx: -1, dy: -1).contains(location) } ?? .zero
         exitScreen = screen
+        parkPoint = location
         remote = true
         capture.suppressing = true
         CGAssociateMouseAndMouseCursorPosition(0)
+        if conceal { concealer.hide() }
         Log.session.info("server session: edge crossed → REMOTE")
         // The client enters through the edge opposite to ours and detects the
         // return crossing itself (LEAVE_REQUEST) — no server-side simulation
@@ -136,12 +174,26 @@ public final class ServerSession: @unchecked Sendable {
     private func handleRemote(_ event: CapturedEvent) {
         switch event {
         case let .mouseMoved(dx, dy, _):
+            metrics.bump(.capturedMouseMove)
             transport.send([.mouseMove(dx: Float(dx), dy: Float(dy))])
+            // Keep the physical arrow pinned at the crossing point. Dissociation
+            // alone lapses across system transitions; a re-warp per captured move
+            // is the belt-and-suspenders lan-mouse/Deskflow use (R18). The warp
+            // emits no tap event, so it never feeds back into capture.
+            CGWarpMouseCursorPosition(parkPoint)
         case let .mouseButton(button, isDown):
+            metrics.bump(.capturedButton)
             transport.send([.mouseButton(button: button, pressed: isDown)])
         case let .scroll(dx, dy):
+            metrics.bump(.capturedScroll)
             transport.send([.scroll(dx: Float(dx), dy: Float(dy))])
+        case let .scrollContinuous(dx, dy, phase, momentum):
+            metrics.bump(.capturedScrollContinuous)
+            transport.send([.scrollContinuous(
+                dx: Float(dx), dy: Float(dy), phase: phase, momentum: momentum
+            )])
         case let .key(macKeycode, isDown):
+            metrics.bump(.capturedKey)
             // Emergency escape (R4): Esc 3× within 1 s always returns control.
             // The Esc presses do reach the client first — acceptable MVP noise.
             if macKeycode == 0x35, isDown,
@@ -159,6 +211,7 @@ public final class ServerSession: @unchecked Sendable {
         remote = false
         capture.suppressing = false
         CGAssociateMouseAndMouseCursorPosition(1)
+        concealer.show() // restore the local arrow (idempotent when never hidden)
 
         // Re-place the physical cursor on the edge it conceptually re-entered.
         if let exitCoordinate, exitScreen != .zero {

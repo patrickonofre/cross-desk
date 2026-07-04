@@ -16,6 +16,9 @@ public struct AppConfig: Codable, Equatable, Sendable {
     /// STATE.md.
     public var pairingCode: String
     public var deviceName: String
+    /// Hide the arrow on the unfocused machine (R17). Off → cursor stays visible
+    /// but parked (R18). Default on.
+    public var concealCursor: Bool
 
     public init(
         role: Role = .server,
@@ -23,7 +26,8 @@ public struct AppConfig: Codable, Equatable, Sendable {
         serverHost: String = "",
         port: UInt16 = ProtocolConstants.defaultPort,
         pairingCode: String = "",
-        deviceName: String = Host.current().localizedName ?? "Mac"
+        deviceName: String = Host.current().localizedName ?? "Mac",
+        concealCursor: Bool = true
     ) {
         self.role = role
         self.edgeSide = edgeSide
@@ -31,6 +35,23 @@ public struct AppConfig: Codable, Equatable, Sendable {
         self.port = port
         self.pairingCode = pairingCode
         self.deviceName = deviceName
+        self.concealCursor = concealCursor
+    }
+
+    // Tolerant decode: a config written by an older build is missing newer keys
+    // (e.g. concealCursor). Fill absent keys with defaults instead of throwing —
+    // ConfigStore reserves throwing for genuinely corrupt (unparseable) files,
+    // never for a stale-but-valid config that would discard the pairing code.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = AppConfig()
+        role = try c.decodeIfPresent(Role.self, forKey: .role) ?? d.role
+        edgeSide = try c.decodeIfPresent(EdgeSide.self, forKey: .edgeSide) ?? d.edgeSide
+        serverHost = try c.decodeIfPresent(String.self, forKey: .serverHost) ?? d.serverHost
+        port = try c.decodeIfPresent(UInt16.self, forKey: .port) ?? d.port
+        pairingCode = try c.decodeIfPresent(String.self, forKey: .pairingCode) ?? d.pairingCode
+        deviceName = try c.decodeIfPresent(String.self, forKey: .deviceName) ?? d.deviceName
+        concealCursor = try c.decodeIfPresent(Bool.self, forKey: .concealCursor) ?? d.concealCursor
     }
 }
 

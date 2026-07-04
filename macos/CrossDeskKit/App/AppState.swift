@@ -83,7 +83,8 @@ final class AppState: ObservableObject {
             let session = ServerSession(
                 port: config.port,
                 pairingCode: config.pairingCode,
-                edgeSide: config.edgeSide
+                edgeSide: config.edgeSide,
+                conceal: config.concealCursor
             )
             session.onState = onState
             do {
@@ -104,7 +105,8 @@ final class AppState: ObservableObject {
                 host: config.serverHost,
                 port: config.port,
                 pairingCode: config.pairingCode,
-                deviceName: config.deviceName
+                deviceName: config.deviceName,
+                conceal: config.concealCursor
             )
             session.onState = onState
             session.start()
