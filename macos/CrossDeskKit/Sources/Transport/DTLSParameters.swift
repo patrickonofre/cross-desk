@@ -46,4 +46,6 @@ enum TransportTiming {
     /// DTLS + HELLO must complete within this window or the attempt is dropped
     /// (a connection stuck in .preparing never reaches .failed on its own).
     static let handshakeTimeout: TimeInterval = 5
+    /// PAIR_SET resend cadence until PAIR_ACK arrives (PROTOCOL.md §3).
+    static let pairSetResendInterval: TimeInterval = 2
 }

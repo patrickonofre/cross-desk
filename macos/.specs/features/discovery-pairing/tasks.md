@@ -21,23 +21,17 @@ Numeração continua a do projeto (input-polish terminou em T28). Gate padrão: 
 
 ## Fase B — Transporte (depende de T29–T31)
 
-- ☐ **T32 — DTLSServer: advertise + rotação** (R25, R29 servidor)
-  - What: `init(port:psk:advertise:)` com `NWListener.Service("_crossdesk._udp", TXT proto=1)`; modo pareamento (iniciado com PSK de token): pós-HELLO gera segredo (`PairingKey.generateCode()`), envia `PAIR_SET` com re-envio a cada 2 s até `PAIR_ACK` (mesmo segredo — idempotente); no ACK → `onPaired(secret)` + `rotateListener(psk:)` (cancela+recria listener, conexão ativa preservada).
-  - Where: `Sources/Transport/DTLSServer.swift`.
-  - Done when: análise de falha do design (tabela §2) coberta: SET perdido re-envia; ACK duplicado inócuo; rotateListener não derruba a sessão ativa (incerteza 3 morta).
-  - Prova: `TransportLoopbackTests` — pareamento e2e em loopback (server token-mode + client → PAIR_SET/ACK → callbacks disparam com o mesmo segredo → sessão segue viva → nova conexão só entra com PSK do segredo).
+- ☑ **T32 — DTLSServer: advertise + rotação** ✅ (2026-07-04) (R25, R29 servidor)
+  - `init(port:psk:advertiseName:pairing:)` — advertise via `NWListener.Service(_crossdesk._udp, TXT proto=1)`; pareamento: pós-HELLO `beginPairing()` (segredo fixo por tentativa, PAIR_SET re-enviado a 2 s), `completePairing()` no ACK → persiste via `onPaired` + recria listener com PSK do segredo (conexão ativa preservada — incerteza 3 morta). Bind race do rebind coberto (retry 5× c/ 0.4 s, guard por `listenerGeneration`). Teardown cancela pareamento não-ACKado (segredo novo na próxima tentativa).
+  - Prova: `TransportLoopbackTests.testPairingRotatesToSecretAndListenerAcceptsOnlySecretAfterwards` — secrets iguais nos 2 lados, sessão sobrevive à rotação, 2º cliente só entra com o segredo.
 
-- ☐ **T33 — DTLSClient: endpoint Bonjour + pareamento + fallback** (R27, R29 cliente, R30)
-  - What: `init(endpoint: NWEndpoint, psk:deviceName:)` (`.service` ou `.hostPort` — call sites atualizados); `handleDatagram` trata PAIR_SET → `onPairSet(secret)` + PAIR_ACK (duplicado → re-ACK); fallback de credencial: `credentials (secret?, token?)` + troca de PSK no ciclo de reconexão após handshake timeout com segredo.
-  - Where: `Sources/Transport/DTLSClient.swift`.
-  - Done when: PAIR_SET duplicado re-ACKa sem re-persistir efeito colateral; sequência "segredo falha → token conecta → rotação → segredo novo" funciona.
-  - Prova: `TransportLoopbackTests` — fallback e2e (server com PSK X, client com segredo errado + token X → conecta na 2ª tentativa), ACK duplicado.
+- ☑ **T33 — DTLSClient: endpoint Bonjour + pareamento + fallback** ✅ (2026-07-04) (R27, R29 cliente, R30)
+  - `init(endpoint:psk:fallbackPSK:deviceName:)` + convenience host:port (call sites intactos); PAIR_SET → persiste via `onPairSet` ANTES do ACK (duplicado → re-persiste + re-ACKa); fallback: alterna credencial após handshake timeout sem conexão prévia.
+  - Prova: `testClientFallsBackToTokenWhenSecretHandshakeTimesOut` (segredo velho → token → re-rotação) + `testDuplicatePairSetPersistsSameSecretAndDoesNotCrash`.
 
-- ☐ **T34 — ServerBrowser (descoberta no cliente)** (R26, R33 detecção)
-  - What: `ServerBrowser` (`NWBrowser` de `_crossdesk._udp`): `onUpdate([DiscoveredServer])` (name + endpoint), `permissionDenied` a partir de `.waiting`, start/stop idempotentes, queue própria.
-  - Where: `Sources/Transport/ServerBrowser.swift` (novo).
-  - Done when: advertise do T32 na mesma máquina aparece no browse (incerteza 1 morta: connect via endpoint `.service` incluso no teste); stop cessa updates.
-  - Prova: `TransportLoopbackTests` (ou `DiscoveryTests` novo) — advertise+browse+connect loopback com timeout generoso (mDNS local).
+- ☑ **T34 — ServerBrowser (descoberta no cliente)** ✅ (2026-07-04) (R26, R33 detecção)
+  - `Sources/Transport/ServerBrowser.swift` — `NWBrowser(_crossdesk._udp)`, `onUpdate([DiscoveredServer])` (lista completa ordenada), `onPermissionState` (waiting → denied, ready → ok), restart em `.failed`, start/stop idempotentes.
+  - Prova: `DiscoveryTests.testAdvertisedServerIsDiscoveredAndConnectable` — advertise+browse+**connect via endpoint `.service`** em loopback PASSOU de verdade (1 s, sem skip) → incerteza 1 morta. Skip automático se mDNS bloqueado no ambiente (UAT cobre).
 
 ## Fase C — Sessões + UI + bundle
 

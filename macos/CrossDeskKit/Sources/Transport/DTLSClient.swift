@@ -4,12 +4,20 @@ import Network
 /// DTLS-PSK client (R9, R10). Reconnects automatically with exponential
 /// backoff (1 s → 30 s) until `stop()` is called.
 ///
+/// Connects to a plain host:port or to a Bonjour endpoint discovered via
+/// `ServerBrowser` (R27 — SRV resolution is the framework's job). When given
+/// a fallback PSK, alternates credentials between handshake timeouts (R30:
+/// paired secret first, short token as fallback) and handles the PAIR_SET
+/// rotation (R29, PROTOCOL.md §6).
+///
 /// Thread-safety: state confined to `queue` (see DTLSServer).
 public final class DTLSClient: @unchecked Sendable {
-    private let host: String
-    private let port: UInt16
-    private let psk: Data
+    private let endpoint: NWEndpoint
     private let deviceName: String
+    /// Credentials in preference order (primary first). One entry = today's
+    /// fixed-PSK behavior; two = paired secret + pairing-token fallback.
+    private let psks: [Data]
+    private var activePSKIndex = 0
     private let queue = DispatchQueue(label: "crossdesk.transport.client")
 
     private var connection: NWConnection?
@@ -21,12 +29,25 @@ public final class DTLSClient: @unchecked Sendable {
 
     /// Called on the transport queue.
     public var onEvent: (@Sendable (TransportEvent) -> Void)?
+    /// PAIR_SET arrived: persist this secret (32 hex chars) BEFORE any reply
+    /// hits the wire — the client must never ACK a secret it hasn't stored
+    /// (PROTOCOL.md §6). Fired on the transport queue; may repeat with the
+    /// same value if the ACK was lost (persisting again is harmless).
+    public var onPairSet: (@Sendable (String) -> Void)?
 
-    public init(host: String, port: UInt16, psk: Data, deviceName: String) {
-        self.host = host
-        self.port = port
-        self.psk = psk
+    public init(endpoint: NWEndpoint, psk: Data, fallbackPSK: Data? = nil, deviceName: String) {
+        self.endpoint = endpoint
+        self.psks = [psk] + (fallbackPSK.map { [$0] } ?? [])
         self.deviceName = deviceName
+    }
+
+    public convenience init(host: String, port: UInt16, psk: Data, fallbackPSK: Data? = nil, deviceName: String) {
+        self.init(
+            endpoint: .hostPort(host: NWEndpoint.Host(host), port: NWEndpoint.Port(rawValue: port)!),
+            psk: psk,
+            fallbackPSK: fallbackPSK,
+            deviceName: deviceName
+        )
     }
 
     public func start() {
@@ -61,12 +82,9 @@ public final class DTLSClient: @unchecked Sendable {
 
     private func connect() {
         guard !stopped else { return }
-        Log.transport.info("client: connecting to \(self.host, privacy: .public):\(self.port, privacy: .public), psk fingerprint \(PairingKey.fingerprint(psk: self.psk), privacy: .public)")
-        let connection = NWConnection(
-            host: NWEndpoint.Host(host),
-            port: NWEndpoint.Port(rawValue: port)!,
-            using: DTLSParameters.make(psk: psk)
-        )
+        let psk = psks[activePSKIndex]
+        Log.transport.info("client: connecting to \(String(describing: self.endpoint), privacy: .public), psk fingerprint \(PairingKey.fingerprint(psk: psk), privacy: .public) (credential \(self.activePSKIndex, privacy: .public))")
+        let connection = NWConnection(to: endpoint, using: DTLSParameters.make(psk: psk))
         self.connection = connection
         handshakeDone = false
 
@@ -129,7 +147,9 @@ public final class DTLSClient: @unchecked Sendable {
         }
     }
 
-    private func handleDatagram(_ data: Data) {
+    // Internal (not private) so tests can exercise PAIR_SET dedup semantics
+    // without a live connection (the ACK send is nil-safe).
+    func handleDatagram(_ data: Data) {
         lastReceived = Date()
         guard let decoded = try? Message.decodeAll(data) else { return }
         var inputMessages: [Message] = []
@@ -146,6 +166,12 @@ public final class DTLSClient: @unchecked Sendable {
                 }
             case .heartbeat:
                 break
+            case let .pairSet(code):
+                // Persist-then-ACK, in this order (PROTOCOL.md §6). Duplicate
+                // SET (our ACK got lost) → same secret persisted again + re-ACK.
+                Log.transport.info("client: PAIR_SET received → persisting rotated secret + ACK")
+                onPairSet?(code)
+                connection?.send(content: Message.pairAck.encoded(), completion: .idempotent)
             case .bye:
                 connectionLost(reason: "peer sent BYE")
                 return
@@ -180,6 +206,14 @@ public final class DTLSClient: @unchecked Sendable {
     private func connectionLost(reason: String) {
         Log.transport.info("client: connection lost — \(reason, privacy: .public)")
         let wasConnected = handshakeDone
+        // Handshake never completed → likely wrong PSK on this credential
+        // (paired secret the server has since forgotten, R30). Alternate to
+        // the other credential for the next attempt; harmless when the real
+        // cause is a dead server (both time out the same way).
+        if !wasConnected, reason == "handshake timeout", psks.count > 1 {
+            activePSKIndex = (activePSKIndex + 1) % psks.count
+            Log.transport.info("client: switching to credential \(self.activePSKIndex, privacy: .public) for next attempt")
+        }
         teardown()
         if wasConnected {
             onEvent?(.disconnected(reason: reason))

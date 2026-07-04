@@ -17,10 +17,14 @@ final class TransportLoopbackTests: XCTestCase {
         Self.nextPort += 1
     }
 
+    private var client2: DTLSClient?
+
     override func tearDown() {
         client?.stop()
+        client2?.stop()
         server?.stop()
         client = nil
+        client2 = nil
         server = nil
         super.tearDown()
     }
@@ -129,6 +133,102 @@ final class TransportLoopbackTests: XCTestCase {
         wait(for: [reconnect], timeout: 20)
     }
 
+    // MARK: - Pairing rotation (R29, R30 — PROTOCOL.md §6)
+
+    func testPairingRotatesToSecretAndListenerAcceptsOnlySecretAfterwards() throws {
+        let tokenPSK = PairingKey.psk(fromCode: "ABCD-EFGH")
+        let serverSecret = LockedValue<String?>(nil)
+        let clientSecret = LockedValue<String?>(nil)
+        let paired = expectation(description: "server got PAIR_ACK")
+        let pairSet = expectation(description: "client got PAIR_SET")
+        pairSet.assertForOverFulfill = false // resend before the ACK lands is legal
+
+        server = DTLSServer(port: port, psk: tokenPSK, pairing: true)
+        server.onPaired = { secret in
+            serverSecret.set(secret)
+            paired.fulfill()
+        }
+        try server.start()
+
+        client = DTLSClient(host: "127.0.0.1", port: port, psk: tokenPSK, deviceName: "c")
+        client.onPairSet = { secret in
+            if clientSecret.get() == nil {
+                clientSecret.set(secret)
+                pairSet.fulfill()
+            }
+        }
+        client.start()
+
+        wait(for: [pairSet, paired], timeout: 10)
+        XCTAssertEqual(serverSecret.get(), clientSecret.get())
+        let secret = try XCTUnwrap(serverSecret.get())
+        XCTAssertEqual(secret.count, 32) // 128-bit hex — never the short token
+
+        // The paired session must survive the listener rotation.
+        let survived = expectation(description: "input flows after rotation")
+        survived.assertForOverFulfill = false
+        client.onEvent = { event in
+            if case .messages = event { survived.fulfill() }
+        }
+        server.send([.mouseMove(dx: 1, dy: 1)])
+        wait(for: [survived], timeout: 5)
+
+        // New handshakes must require the secret (listener rotated).
+        client.stop() // frees the single client slot (BYE → immediate drop)
+        let reconnected = expectation(description: "second client connects with the secret")
+        client2 = DTLSClient(
+            host: "127.0.0.1", port: port,
+            psk: PairingKey.psk(fromCode: secret), deviceName: "c2"
+        )
+        client2?.onEvent = { event in
+            if case .connected = event { reconnected.fulfill() }
+        }
+        client2?.start()
+        wait(for: [reconnected], timeout: 15)
+    }
+
+    func testClientFallsBackToTokenWhenSecretHandshakeTimesOut() throws {
+        // "Server forgot the pairing" (R30): client leads with a stale secret,
+        // must recover through the token on a later attempt, and the server
+        // re-runs the rotation.
+        let tokenPSK = PairingKey.psk(fromCode: "QQQQ-WWWW")
+        let staleSecret = PairingKey.psk(fromCode: PairingKey.generateCode())
+        let connected = expectation(description: "connected via fallback token")
+        let repaired = expectation(description: "rotation re-ran after fallback")
+        repaired.assertForOverFulfill = false
+
+        server = DTLSServer(port: port, psk: tokenPSK, pairing: true)
+        try server.start()
+
+        client = DTLSClient(
+            host: "127.0.0.1", port: port,
+            psk: staleSecret, fallbackPSK: tokenPSK, deviceName: "c"
+        )
+        client.onEvent = { event in
+            if case .connected = event { connected.fulfill() }
+        }
+        client.onPairSet = { _ in repaired.fulfill() }
+        client.start()
+
+        // Stale-secret attempt burns a full handshake timeout (5 s) + backoff
+        // before the token attempt can run.
+        wait(for: [connected, repaired], timeout: 25)
+    }
+
+    func testDuplicatePairSetPersistsSameSecretAndDoesNotCrash() {
+        // ACK lost → server resends PAIR_SET; the client must persist the same
+        // value again (harmless) rather than treat it as an error.
+        let received = LockedValue<[String]>([])
+        let offline = DTLSClient(host: "127.0.0.1", port: 1, psk: Data(count: 32), deviceName: "c")
+        offline.onPairSet = { code in received.mutate { $0.append(code) } }
+
+        let datagram = Message.pairSet(code: "0123456789abcdef0123456789abcdef").encoded()
+        offline.handleDatagram(datagram)
+        offline.handleDatagram(datagram)
+
+        XCTAssertEqual(received.get(), Array(repeating: "0123456789abcdef0123456789abcdef", count: 2))
+    }
+
     func testDatagramSplittingRespectsMaxSize() {
         let moves = (0..<200).map { Message.mouseMove(dx: Float($0), dy: 1) }
         let datagrams = DTLSServer.datagrams(from: moves)
@@ -151,5 +251,27 @@ private final class OSAllocatedUnfairLockBox: @unchecked Sendable {
         defer { lock.unlock() }
         value += 1
         return value
+    }
+}
+
+/// Thread-safe value box for capturing callback payloads in tests.
+final class LockedValue<T>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: T
+    init(_ value: T) { self.value = value }
+    func get() -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
+    func set(_ newValue: T) {
+        lock.lock()
+        defer { lock.unlock() }
+        value = newValue
+    }
+    func mutate(_ body: (inout T) -> Void) {
+        lock.lock()
+        defer { lock.unlock() }
+        body(&value)
     }
 }

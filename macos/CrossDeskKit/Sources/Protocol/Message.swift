@@ -6,6 +6,8 @@ public enum ProtocolConstants {
     public static let defaultPort: UInt16 = 24800
     /// Application datagrams must stay under this size to avoid IP fragmentation.
     public static let maxDatagramSize = 1200
+    /// Bonjour service type advertised by the server while active (§7).
+    public static let bonjourServiceType = "_crossdesk._udp"
 }
 
 public enum ProtocolError: Error, Equatable {
