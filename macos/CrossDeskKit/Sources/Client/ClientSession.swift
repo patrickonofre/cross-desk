@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import Network
 
 /// Client orchestration (R6–R8, R17–R19): receives remote input over DTLS and
 /// injects it locally; freezes/hides this machine's arrow while connected but
@@ -15,11 +16,17 @@ public final class ClientSession: @unchecked Sendable {
 
     /// Called on the transport queue.
     public var onState: (@Sendable (SessionState) -> Void)?
+    /// PAIR_SET arrived: persist this secret before anything else (R29 —
+    /// the transport only ACKs after this returns). On the transport queue.
+    public var onPairSet: (@Sendable (String) -> Void)?
 
+    /// `endpoint`: Bonjour `.service` from discovery (R27) or `.hostPort` for
+    /// the manual path (R32). Credentials (R30): `pairedSecret` leads when
+    /// present, `pairingToken` is the fallback — at least one must be non-empty.
     public init(
-        host: String,
-        port: UInt16,
-        pairingCode: String,
+        endpoint: NWEndpoint,
+        pairedSecret: String,
+        pairingToken: String,
         deviceName: String,
         conceal: Bool = true,
         injector: InputInjector = InputInjector(),
@@ -28,10 +35,16 @@ public final class ClientSession: @unchecked Sendable {
         metrics: InputMetrics = InputMetrics(),
         cursorLocation: @escaping @Sendable () -> CGPoint = { CGEvent(source: nil)?.location ?? .zero }
     ) {
+        precondition(
+            !pairedSecret.isEmpty || !pairingToken.isEmpty,
+            "ClientSession needs a paired secret or a pairing token"
+        )
+        let secretPSK = pairedSecret.isEmpty ? nil : PairingKey.psk(fromCode: pairedSecret)
+        let tokenPSK = pairingToken.isEmpty ? nil : PairingKey.psk(fromCode: pairingToken)
         self.transport = DTLSClient(
-            host: host,
-            port: port,
-            psk: PairingKey.psk(fromCode: pairingCode),
+            endpoint: endpoint,
+            psk: secretPSK ?? tokenPSK!,
+            fallbackPSK: secretPSK != nil ? tokenPSK : nil,
             deviceName: deviceName
         )
         self.injector = injector
@@ -91,6 +104,9 @@ public final class ClientSession: @unchecked Sendable {
             guard let self else { return }
             self.metrics.bump(.reasserts)
             self.sentinel.reassert()
+        }
+        transport.onPairSet = { [weak self] secret in
+            self?.onPairSet?(secret)
         }
         transport.onEvent = { [weak self] event in
             guard let self else { return }

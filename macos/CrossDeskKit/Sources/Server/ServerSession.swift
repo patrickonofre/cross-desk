@@ -35,11 +35,19 @@ public final class ServerSession: @unchecked Sendable {
 
     /// Called on the session queue.
     public var onState: (@Sendable (SessionState) -> Void)?
+    /// Pairing rotation completed (R29): persist this secret — from now on the
+    /// listener only accepts handshakes derived from it. On the transport queue.
+    public var onPaired: (@Sendable (String) -> Void)?
 
+    /// `pairingCode`: short token while unpaired, rotated secret once paired —
+    /// the caller decides which (and sets `pairing` accordingly).
+    /// `advertiseName`: Bonjour instance name; nil disables discovery (R25).
     public init(
         port: UInt16,
         pairingCode: String,
         edgeSide: EdgeSide,
+        advertiseName: String? = nil,
+        pairing: Bool = false,
         conceal: Bool = true,
         capture: InputCapture = InputCapture(),
         concealer: CursorConcealer = CursorConcealer(),
@@ -48,7 +56,12 @@ public final class ServerSession: @unchecked Sendable {
         screens: @escaping @Sendable () -> [CGRect] = Displays.activeBounds
     ) {
         self.capture = capture
-        self.transport = DTLSServer(port: port, psk: PairingKey.psk(fromCode: pairingCode))
+        self.transport = DTLSServer(
+            port: port,
+            psk: PairingKey.psk(fromCode: pairingCode),
+            advertiseName: advertiseName,
+            pairing: pairing
+        )
         self.detector = EdgeDetector(side: edgeSide)
         self.screens = screens
         self.concealer = concealer
@@ -89,6 +102,9 @@ public final class ServerSession: @unchecked Sendable {
         transport.onEvent = { [weak self] event in
             guard let self else { return }
             self.queue.async { self.handleTransport(event) }
+        }
+        transport.onPaired = { [weak self] secret in
+            self?.onPaired?(secret)
         }
         observer.onReassert = { [weak self] _ in
             guard let self else { return }

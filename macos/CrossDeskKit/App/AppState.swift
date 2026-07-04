@@ -1,4 +1,5 @@
 import SwiftUI
+import Network
 import CrossDeskKit
 
 @MainActor
@@ -8,20 +9,34 @@ final class AppState: ObservableObject {
     @Published var running = false
     @Published var inputMonitoringGranted = false
     @Published var accessibilityGranted = false
+    /// Servers visible on the LAN (client role, R26).
+    @Published var discoveredServers: [DiscoveredServer] = []
+    /// Local Network permission looks denied (browser stuck waiting, R33).
+    @Published var localNetworkDenied = false
 
     private let store = ConfigStore()
+    private let browser = ServerBrowser()
     private var serverSession: ServerSession?
     private var clientSession: ClientSession?
 
     init() {
         var loaded = (try? store.load()) ?? AppConfig()
-        // First run as server: a pairing code must exist before the UI shows it.
+        // First run as server: a pairing token must exist before the UI shows it.
         if loaded.pairingCode.isEmpty && loaded.role == .server {
-            loaded.pairingCode = PairingKey.generateCode()
+            loaded.pairingCode = PairingKey.generateShortToken()
         }
         config = loaded
         saveConfig()
         refreshPermissions()
+
+        browser.onUpdate = { [weak self] servers in
+            Task { @MainActor in self?.discoveredServers = servers }
+        }
+        browser.onPermissionState = { [weak self] denied in
+            Task { @MainActor in self?.localNetworkDenied = denied }
+        }
+        updateBrowsing()
+
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
         Log.app.info("app launched (build \(build, privacy: .public)), role \(loaded.role.rawValue, privacy: .public)")
     }
@@ -35,22 +50,45 @@ final class AppState: ObservableObject {
         try? store.save(config)
     }
 
-    func regeneratePairingCode() {
-        config.pairingCode = PairingKey.generateCode()
+    // MARK: - Pairing state
+
+    /// Paired = the rotated 128-bit secret is stored (R29).
+    var paired: Bool { !config.pairedSecret.isEmpty }
+
+    func regeneratePairingToken() {
+        config.pairingCode = PairingKey.generateShortToken()
         saveConfig()
     }
 
-    func copyPairingCode() {
+    func copyPairingToken() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(config.pairingCode, forType: .string)
     }
 
-    /// 6-char check value derived from the pairing code — must render
-    /// identically on both machines, or the codes differ (top field cause of
-    /// "handshake timeout").
-    var pairingFingerprint: String? {
-        guard !config.pairingCode.isEmpty else { return nil }
-        return PairingKey.fingerprint(psk: PairingKey.psk(fromCode: config.pairingCode))
+    /// Drops the pairing on this side (R31). Server: fresh token, back to
+    /// "waiting for pairing". Client: back to the list, token required again.
+    func forgetPairing() {
+        if running { stop() }
+        config.pairedSecret = ""
+        config.pairedServerName = ""
+        switch config.role {
+        case .server: config.pairingCode = PairingKey.generateShortToken()
+        case .client: config.pairingCode = ""
+        }
+        saveConfig()
+    }
+
+    // MARK: - Discovery lifecycle
+
+    /// Browse only while the user could actually pick a server: client role,
+    /// session stopped (R26 + less mDNS radiation).
+    func updateBrowsing() {
+        if config.role == .client && !running {
+            browser.start()
+        } else {
+            browser.stop()
+            discoveredServers = []
+        }
     }
 
     var permissionNeededForCurrentRole: Bool {
@@ -60,59 +98,127 @@ final class AppState: ObservableObject {
         }
     }
 
-    func toggle() {
-        running ? stop() : start()
+    // MARK: - Server role
+
+    func toggleServer() {
+        running ? stop() : startServer()
     }
 
-    private func start() {
+    private func startServer() {
         saveConfig()
         refreshPermissions()
-        Log.app.info("start: role \(self.config.role.rawValue, privacy: .public), inputMonitoring \(self.inputMonitoringGranted, privacy: .public), accessibility \(self.accessibilityGranted, privacy: .public)")
-        guard !permissionNeededForCurrentRole else {
-            Log.app.error("start blocked: permission missing for role \(self.config.role.rawValue, privacy: .public) — if it was just granted, the app must be relaunched (per-process TCC cache)")
+        Log.app.info("start server: inputMonitoring \(self.inputMonitoringGranted, privacy: .public), paired \(self.paired, privacy: .public)")
+        guard inputMonitoringGranted else {
             sessionState = .error("Permissão pendente — reinicie o app se acabou de conceder")
             return
         }
-
-        let onState: @Sendable (SessionState) -> Void = { [weak self] state in
+        // Paired → listen with the secret; unpaired → token PSK + rotation on
+        // the first successful handshake (R29).
+        let session = ServerSession(
+            port: config.port,
+            pairingCode: paired ? config.pairedSecret : config.pairingCode,
+            edgeSide: config.edgeSide,
+            advertiseName: config.deviceName,
+            pairing: !paired,
+            conceal: config.concealCursor
+        )
+        session.onState = { [weak self] state in
             Task { @MainActor in self?.sessionState = state }
         }
-
-        switch config.role {
-        case .server:
-            let session = ServerSession(
-                port: config.port,
-                pairingCode: config.pairingCode,
-                edgeSide: config.edgeSide,
-                conceal: config.concealCursor
-            )
-            session.onState = onState
-            do {
-                try session.start()
-                serverSession = session
-                running = true
-            } catch {
-                Log.app.error("start failed: capture start threw \(String(describing: error), privacy: .public)")
-                sessionState = .error("Falha ao iniciar captura — reinicie o app")
-                refreshPermissions()
+        session.onPaired = { [weak self] secret in
+            Task { @MainActor in
+                guard let self else { return }
+                self.config.pairedSecret = secret
+                self.saveConfig()
+                Log.app.info("server paired — rotated secret persisted")
             }
-        case .client:
-            guard !config.serverHost.isEmpty, !config.pairingCode.isEmpty else {
-                sessionState = .error("Preencha servidor e código de pareamento")
-                return
-            }
-            let session = ClientSession(
-                host: config.serverHost,
-                port: config.port,
-                pairingCode: config.pairingCode,
-                deviceName: config.deviceName,
-                conceal: config.concealCursor
-            )
-            session.onState = onState
-            session.start()
-            clientSession = session
-            running = true
         }
+        do {
+            try session.start()
+            serverSession = session
+            running = true
+            updateBrowsing()
+        } catch {
+            Log.app.error("start failed: capture start threw \(String(describing: error), privacy: .public)")
+            sessionState = .error("Falha ao iniciar captura — reinicie o app")
+            refreshPermissions()
+        }
+    }
+
+    // MARK: - Client role
+
+    /// Connect to a discovered server (R27). `token` is what the user just
+    /// typed (nil when tapping an already-paired server).
+    func connect(to server: DiscoveredServer, token: String? = nil) {
+        if let token, !token.isEmpty {
+            config.pairingCode = token
+        }
+        // The stored secret belongs to ONE server — never lead with it against
+        // a different one (the token typed for the new server is the credential).
+        let secret = server.name == config.pairedServerName ? config.pairedSecret : ""
+        config.pairedServerName = server.name
+        startClient(endpoint: server.endpoint, secret: secret, token: config.pairingCode)
+    }
+
+    /// Manual fallback for networks without mDNS (R32).
+    func connectManual(host: String, token: String) {
+        config.serverHost = host
+        if !token.isEmpty {
+            config.pairingCode = token
+        }
+        guard let port = NWEndpoint.Port(rawValue: config.port) else { return }
+        startClient(
+            endpoint: .hostPort(host: NWEndpoint.Host(host), port: port),
+            secret: config.pairedSecret,
+            token: config.pairingCode
+        )
+    }
+
+    private func startClient(endpoint: NWEndpoint, secret: String, token: String) {
+        saveConfig()
+        refreshPermissions()
+        guard accessibilityGranted else {
+            sessionState = .error("Permissão pendente — reinicie o app se acabou de conceder")
+            return
+        }
+        guard !secret.isEmpty || !token.isEmpty else {
+            sessionState = .error("Digite o token exibido no servidor")
+            return
+        }
+        let session = ClientSession(
+            endpoint: endpoint,
+            pairedSecret: secret,
+            pairingToken: token,
+            deviceName: config.deviceName,
+            conceal: config.concealCursor
+        )
+        session.onState = { [weak self] state in
+            Task { @MainActor in self?.sessionState = state }
+        }
+        session.onPairSet = { [weak self] secret in
+            Task { @MainActor in
+                guard let self else { return }
+                self.config.pairedSecret = secret
+                self.saveConfig()
+                Log.app.info("client paired — rotated secret persisted")
+            }
+        }
+        session.start()
+        clientSession = session
+        running = true
+        updateBrowsing()
+    }
+
+    // MARK: - Shared
+
+    func stop() {
+        serverSession?.stop()
+        clientSession?.stop()
+        serverSession = nil
+        clientSession = nil
+        running = false
+        sessionState = .stopped
+        updateBrowsing()
     }
 
     /// Accessibility/Input Monitoring grants only take effect on a fresh
@@ -133,21 +239,16 @@ final class AppState: ObservableObject {
         NSApplication.shared.terminate(nil)
     }
 
-    private func stop() {
-        serverSession?.stop()
-        clientSession?.stop()
-        serverSession = nil
-        clientSession = nil
-        running = false
-        sessionState = .stopped
-    }
-
     var statusText: String {
         switch sessionState {
         case .stopped:
             "Parado"
         case .waitingPeer:
-            config.role == .server ? "Aguardando cliente…" : "Conectando…"
+            if config.role == .server {
+                paired ? "Aguardando cliente…" : "Aguardando pareamento…"
+            } else {
+                "Conectando…"
+            }
         case let .connected(peer):
             "Conectado: \(peer)"
         case let .controllingRemote(peer):

@@ -4,9 +4,12 @@ import Network
 /// A CrossDesk server visible on the LAN (R26). The endpoint is the Bonjour
 /// service endpoint — hand it straight to `DTLSClient(endpoint:...)`; SRV/port
 /// resolution happens inside the connection (R27).
-public struct DiscoveredServer: Equatable, Sendable {
+public struct DiscoveredServer: Equatable, Sendable, Identifiable {
     public let name: String
     public let endpoint: NWEndpoint
+
+    /// Bonjour instance names are unique per network (mDNS auto-renames).
+    public var id: String { name }
 
     public init(name: String, endpoint: NWEndpoint) {
         self.name = name

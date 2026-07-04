@@ -35,23 +35,17 @@ Numeração continua a do projeto (input-polish terminou em T28). Gate padrão: 
 
 ## Fase C — Sessões + UI + bundle
 
-- ☐ **T35 — Fiação nas sessões** (R29/R30/R31 orquestração)
-  - What: `ServerSession` aceita `advertiseName` + repassa `onPaired`; `ClientSession` aceita endpoint/credenciais + repassa `onPairSet`; estados novos para UI (`pairing`, `paired(name)`) no `SessionState` se necessário.
-  - Where: `Sources/Server/ServerSession.swift` · `Sources/Client/ClientSession.swift` · `Sources/Protocol/` (SessionState, onde vive hoje).
-  - Done when: callbacks chegam ao caller com os dados certos; nenhuma regressão nos testes existentes.
-  - Prova: testes existentes verdes + asserts de fiação onde couber (headless).
+- ☑ **T35 — Fiação nas sessões** ✅ (2026-07-04) (R29/R30/R31 orquestração)
+  - `ServerSession(port:pairingCode:edgeSide:advertiseName:pairing:…)` + `onPaired` repassado do transporte; `ClientSession(endpoint:pairedSecret:pairingToken:…)` (precondition: ≥1 credencial) monta primária/fallback e repassa `onPairSet`. `SessionState` inalterado (UI deriva pareado do config) — estados novos não foram necessários.
+  - Prova: 110 testes verdes sem regressão.
 
-- ☐ **T36 — UI: lista, token, pareado/esquecer, fallback manual** (R26, R27, R28 UI, R31, R32, R33 UX)
-  - What: **Servidor** — token `XXXX-XXXX` grande quando não-pareado, "Pareado ✓" + Esquecer quando pareado, endereços IP movidos pro disclosure. **Cliente** — lista de descobertos (pareado destacado, conecta direto; não-pareado expande campo token), vazio = "Procurando…" + dica Rede Local se negada, `DisclosureGroup("Conectar por IP…")` com host+token, Esquecer. **AppState** — `discoveredServers`, ciclo de vida do browser (papel/sessão), persistência dos callbacks de pareamento.
-  - Where: `App/MenuBarView.swift` · `App/AppState.swift`.
-  - Done when: fluxos do design §5 completos; build roda; estados visuais coerentes com `sessionState`.
-  - Prova: build + inspeção manual (UI); lógica não-visual (ex.: decisão de credencial) coberta por testes de AppState se extraível.
+- ☑ **T36 — UI: lista, token, pareado/esquecer, fallback manual** ✅ (2026-07-04) (R26, R27, R28 UI, R31, R32, R33 UX)
+  - **AppState**: `discoveredServers`/`localNetworkDenied` publicados, browser vive só com papel cliente + sessão parada (`updateBrowsing`), `connect(to:token:)` (segredo NUNCA lidera contra servidor ≠ pareado), `connectManual`, `forgetPairing` (R31 dois lados), `toggleServer`, persistência `onPaired`/`onPairSet`, primeiro token curto no init/regeneração. **MenuBarView**: servidor não-pareado exibe token title2 monospace + copiar/regenerar, pareado = selo + Esquecer, IPs no disclosure; cliente = lista com badge de pareado (conecta direto) / "Parear…" expande campo token, vazio = "Procurando…" + dica de Rede Local (R33), "Conectar por IP…" (R32); footer por papel.
+  - Prova: `swift build --product CrossDeskApp` limpo (warning pré-existente só) + make-app.sh ok. Fingerprint saiu do fluxo principal (design §5).
 
-- ☐ **T37 — Bundle: Rede Local no Info.plist** `[P — a qualquer momento]` (R33)
-  - What: `NSLocalNetworkUsageDescription` + `NSBonjourServices` (`_crossdesk._udp`) no heredoc do plist; bump `CFBundleVersion`.
-  - Where: `Scripts/make-app.sh`.
-  - Done when: app buildada contém as chaves (`plutil -p`); prompt de Rede Local dispara no primeiro browse (verificação final no T38).
-  - Prova: `plutil -p build/CrossDesk.app/Contents/Info.plist` mostra as chaves.
+- ☑ **T37 — Bundle: Rede Local no Info.plist** ✅ (2026-07-04) (R33)
+  - `NSLocalNetworkUsageDescription` + `NSBonjourServices` (`_crossdesk._udp`) no heredoc; `CFBundleVersion` 9→10.
+  - Prova: `plutil -p` mostra as chaves no bundle assinado ("CrossDesk Dev").
 
 ## Fase D — Validação
 

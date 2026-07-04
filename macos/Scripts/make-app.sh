@@ -40,13 +40,19 @@ cat > "$APP_DIR/Contents/Info.plist" <<'PLIST'
     <key>CFBundleShortVersionString</key>
     <string>0.1.0</string>
     <key>CFBundleVersion</key>
-    <string>9</string>
+    <string>10</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>O CrossDesk usa a rede local para encontrar e conectar suas máquinas.</string>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_crossdesk._udp</string>
+    </array>
 </dict>
 </plist>
 PLIST
