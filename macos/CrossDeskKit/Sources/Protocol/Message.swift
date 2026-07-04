@@ -19,6 +19,12 @@ public enum Message: Equatable, Sendable {
     case helloAck(protoVersion: UInt16)
     case heartbeat
     case bye
+    /// S→C, only inside an established DTLS tunnel: rotates the short pairing
+    /// token to a long-term secret (32 hex chars). Resent until PAIR_ACK
+    /// arrives — always with the same secret, so receiving it twice is safe.
+    case pairSet(code: String)
+    /// C→S: the client persisted the PAIR_SET secret.
+    case pairAck
     /// `edge` = client edge the cursor enters through (also its return edge).
     case enter(x: Float, y: Float, edge: EdgeSide)
     case leave
@@ -37,6 +43,8 @@ public enum Message: Equatable, Sendable {
         case helloAck = 0x02
         case heartbeat = 0x03
         case bye = 0x04
+        case pairSet = 0x05
+        case pairAck = 0x06
         case enter = 0x10
         case leave = 0x11
         case leaveRequest = 0x12
@@ -76,6 +84,13 @@ extension Message {
             return (.heartbeat, payload)
         case .bye:
             return (.bye, payload)
+        case let .pairSet(code):
+            let codeBytes = Data(code.utf8.prefix(255))
+            payload.append(UInt8(codeBytes.count))
+            payload.append(codeBytes)
+            return (.pairSet, payload)
+        case .pairAck:
+            return (.pairAck, payload)
         case let .enter(x, y, edge):
             payload.appendLE(x.bitPattern)
             payload.appendLE(y.bitPattern)
@@ -153,6 +168,13 @@ extension Message {
             return .heartbeat
         case .bye:
             return .bye
+        case .pairSet:
+            guard let codeLen = try? reader.u8(),
+                  let codeBytes = try? reader.bytes(Int(codeLen)),
+                  let code = String(data: codeBytes, encoding: .utf8) else { throw invalid() }
+            return .pairSet(code: code)
+        case .pairAck:
+            return .pairAck
         case .enter:
             guard let x = try? reader.f32(), let y = try? reader.f32(),
                   let edgeByte = try? reader.u8(),

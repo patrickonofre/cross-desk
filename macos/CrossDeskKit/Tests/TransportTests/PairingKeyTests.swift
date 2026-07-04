@@ -33,4 +33,43 @@ final class PairingKeyTests: XCTestCase {
         XCTAssertEqual(PairingKey.psk(fromCode: "0123456789ABCDEF0123456789abcdef"), canonical)
         XCTAssertEqual(PairingKey.psk(fromCode: "\t0123456789ABCDEF0123456789ABCDEF "), canonical)
     }
+
+    // MARK: - Short pairing token (R28)
+
+    func testShortTokenFormat() {
+        let token = PairingKey.generateShortToken()
+        XCTAssertEqual(token.count, 9)
+        let groups = token.split(separator: "-")
+        XCTAssertEqual(groups.count, 2)
+        XCTAssertTrue(groups.allSatisfy { $0.count == 4 })
+        let alphabet = Set(PairingKey.tokenAlphabet)
+        XCTAssertTrue(token.replacingOccurrences(of: "-", with: "").allSatisfy(alphabet.contains))
+    }
+
+    func testShortTokenAlphabetHasNoAmbiguousCharacters() {
+        let ambiguous: Set<Character> = ["0", "O", "1", "I", "L", "U"]
+        XCTAssertTrue(ambiguous.isDisjoint(with: PairingKey.tokenAlphabet))
+    }
+
+    func testShortTokensAreUnique() {
+        // 100 draws from a 39-bit space colliding would point at broken RNG
+        // plumbing, not bad luck.
+        let tokens = (0..<100).map { _ in PairingKey.generateShortToken() }
+        XCTAssertEqual(Set(tokens).count, tokens.count)
+    }
+
+    func testShortTokenPSKIgnoresDashAndCase() {
+        // The dash is display-only and users retype tokens in any case: every
+        // spelling of the same token must derive the same PSK (R28).
+        let canonical = PairingKey.psk(fromCode: "abcdefgh")
+        XCTAssertEqual(PairingKey.psk(fromCode: "ABCD-EFGH"), canonical)
+        XCTAssertEqual(PairingKey.psk(fromCode: "abcd-efgh"), canonical)
+        XCTAssertEqual(PairingKey.psk(fromCode: " ABCDEFGH\n"), canonical)
+    }
+
+    func testNormalizeStripsSeparatorsAndLowercases() {
+        XCTAssertEqual(PairingKey.normalize("ABCD-EFGH"), "abcdefgh")
+        XCTAssertEqual(PairingKey.normalize(" ab cd-ef.gh\t"), "abcdefgh")
+        XCTAssertEqual(PairingKey.normalize("0123456789abcdef"), "0123456789abcdef")
+    }
 }

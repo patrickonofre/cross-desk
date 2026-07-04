@@ -8,6 +8,8 @@ hello         HELLO(proto_version=1, name="mac")            0106000100036d6163
 hello_ack     HELLO_ACK(proto_version=1)                    0202000100
 heartbeat     HEARTBEAT                                     030000
 bye           BYE                                           040000
+pair_set      PAIR_SET(code="0123456789abcdef0123456789abcdef") 052100203031323334353637383961626364656630313233343536373839616263646566
+pair_ack      PAIR_ACK                                      060000
 enter         ENTER(x=0.5, y=0.25, edge=0/left)             1009000000003f0000803e00
 leave         LEAVE                                         110000
 leave_request LEAVE_REQUEST(x=0.0, y=0.5)                   120800000000000000003f

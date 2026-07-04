@@ -11,10 +11,17 @@ public struct AppConfig: Codable, Equatable, Sendable {
     /// Client only: server address.
     public var serverHost: String
     public var port: UInt16
-    /// Shared secret. Server generates it; client stores what the user typed.
-    /// Kept in the JSON config for the MVP — Keychain migration is tracked in
-    /// STATE.md.
+    /// Pairing token/code. Server: current short token (regenerated while
+    /// unpaired); client: last token the user typed — kept until a handshake
+    /// with `pairedSecret` succeeds (fallback, R30). Kept in the JSON config
+    /// for the MVP — Keychain migration is tracked in STATE.md.
     public var pairingCode: String
+    /// Long-term secret delivered via PAIR_SET after the first handshake
+    /// (32 hex chars). "" = not paired. Same Keychain caveat as pairingCode.
+    public var pairedSecret: String
+    /// Client only: Bonjour instance name of the paired server — highlights it
+    /// in the discovery list and drives silent reconnection.
+    public var pairedServerName: String
     public var deviceName: String
     /// Hide the arrow on the unfocused machine (R17). Off → cursor stays visible
     /// but parked (R18). Default on.
@@ -26,6 +33,8 @@ public struct AppConfig: Codable, Equatable, Sendable {
         serverHost: String = "",
         port: UInt16 = ProtocolConstants.defaultPort,
         pairingCode: String = "",
+        pairedSecret: String = "",
+        pairedServerName: String = "",
         deviceName: String = Host.current().localizedName ?? "Mac",
         concealCursor: Bool = true
     ) {
@@ -34,6 +43,8 @@ public struct AppConfig: Codable, Equatable, Sendable {
         self.serverHost = serverHost
         self.port = port
         self.pairingCode = pairingCode
+        self.pairedSecret = pairedSecret
+        self.pairedServerName = pairedServerName
         self.deviceName = deviceName
         self.concealCursor = concealCursor
     }
@@ -50,6 +61,8 @@ public struct AppConfig: Codable, Equatable, Sendable {
         serverHost = try c.decodeIfPresent(String.self, forKey: .serverHost) ?? d.serverHost
         port = try c.decodeIfPresent(UInt16.self, forKey: .port) ?? d.port
         pairingCode = try c.decodeIfPresent(String.self, forKey: .pairingCode) ?? d.pairingCode
+        pairedSecret = try c.decodeIfPresent(String.self, forKey: .pairedSecret) ?? d.pairedSecret
+        pairedServerName = try c.decodeIfPresent(String.self, forKey: .pairedServerName) ?? d.pairedServerName
         deviceName = try c.decodeIfPresent(String.self, forKey: .deviceName) ?? d.deviceName
         concealCursor = try c.decodeIfPresent(Bool.self, forKey: .concealCursor) ?? d.concealCursor
     }

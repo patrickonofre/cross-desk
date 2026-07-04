@@ -12,6 +12,10 @@ final class MessageTests: XCTestCase {
         ("hello_ack", .helloAck(protoVersion: 1), "0202000100"),
         ("heartbeat", .heartbeat, "030000"),
         ("bye", .bye, "040000"),
+        ("pair_set",
+         .pairSet(code: "0123456789abcdef0123456789abcdef"),
+         "052100203031323334353637383961626364656630313233343536373839616263646566"),
+        ("pair_ack", .pairAck, "060000"),
         ("enter", .enter(x: 0.5, y: 0.25, edge: .left), "1009000000003f0000803e00"),
         ("leave", .leave, "110000"),
         ("leave_request", .leaveRequest(x: 0.0, y: 0.5), "120800000000000000003f"),
@@ -48,6 +52,8 @@ final class MessageTests: XCTestCase {
             .helloAck(protoVersion: 7),
             .heartbeat,
             .bye,
+            .pairSet(code: "fedcba9876543210fedcba9876543210"),
+            .pairAck,
             .enter(x: 0.0, y: 1.0, edge: .bottom),
             .leave,
             .leaveRequest(x: 1.0, y: 0.75),
@@ -71,6 +77,14 @@ final class MessageTests: XCTestCase {
             [.scrollContinuous(dx: 0, dy: 0, phase: .none, momentum: .none)],
             "an unknown phase value must not poison the datagram"
         )
+    }
+
+    func testPairSetTruncatedCodeThrows() {
+        // code_len claims 32 bytes, payload carries only 4.
+        let data = Data(hexString: "050500" + "20" + "30313233")!
+        XCTAssertThrowsError(try Message.decodeAll(data)) { error in
+            XCTAssertEqual(error as? ProtocolError, .invalidPayload(type: 0x05))
+        }
     }
 
     func testScrollContinuousTruncatedThrows() {

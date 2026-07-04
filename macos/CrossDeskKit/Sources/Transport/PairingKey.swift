@@ -4,21 +4,46 @@ import Security
 
 /// Pairing-code based PSK derivation (PROTOCOL.md §1).
 ///
-/// The server generates the code (128 bits, hex) and shows it in the UI; the
-/// user enters it once on the client. Both sides derive the same DTLS PSK.
+/// Two kinds of code flow through the same HKDF path:
+/// - the short pairing token (8 chars, shown on the server, typed once on the
+///   client — valid only for the pairing window, R28), and
+/// - the long-term secret (32 hex chars, delivered via PAIR_SET inside the
+///   DTLS tunnel after the first successful handshake, R29).
 public enum PairingKey {
     static let salt = Data("crossdesk-v1".utf8)
     static let info = Data("dtls-psk".utf8)
     public static let pskIdentity = "crossdesk"
 
-    /// 32 lowercase hex chars = 128 bits of entropy. Always generated, never
-    /// user-invented: a PSK cipher without (EC)DHE is brute-forceable offline
-    /// if the code is weak (PROTOCOL.md §1 security note).
+    /// 32 lowercase hex chars = 128 bits of entropy. Used for the rotated
+    /// long-term secret (PAIR_SET): a PSK cipher without (EC)DHE is
+    /// brute-forceable offline if the code is weak (PROTOCOL.md §1).
     public static func generateCode() -> String {
         var bytes = [UInt8](repeating: 0, count: 16)
         let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
         precondition(status == errSecSuccess, "SecRandomCopyBytes failed: \(status)")
         return bytes.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Alphabet for short tokens: no 0/O, 1/I/L or U (Crockford-style) — every
+    /// character survives being read aloud or retyped from a screen.
+    static let tokenAlphabet = Array("23456789ABCDEFGHJKMNPQRSTVWXYZ")
+
+    /// Short pairing token, "XXXX-XXXX" (8 chars ≈ 39 bits). Only valid during
+    /// the pairing window: the first successful handshake rotates to a 128-bit
+    /// secret (R29), so this never becomes the long-term key.
+    public static func generateShortToken() -> String {
+        // Rejection sampling — a plain modulo would bias the first 16 alphabet
+        // characters (256 % 30 ≠ 0), and this string is security material.
+        let limit = UInt8(256 - 256 % tokenAlphabet.count) // 240
+        var chars: [Character] = []
+        while chars.count < 8 {
+            var byte: UInt8 = 0
+            let status = SecRandomCopyBytes(kSecRandomDefault, 1, &byte)
+            precondition(status == errSecSuccess, "SecRandomCopyBytes failed: \(status)")
+            guard byte < limit else { continue }
+            chars.append(tokenAlphabet[Int(byte) % tokenAlphabet.count])
+        }
+        return String(chars[0..<4]) + "-" + String(chars[4..<8])
     }
 
     /// Short non-reversible identifier of a PSK, safe to log. Both machines
@@ -28,14 +53,19 @@ public enum PairingKey {
         SHA256.hash(data: psk).prefix(3).map { String(format: "%02x", $0) }.joined()
     }
 
-    /// HKDF-SHA256(code) → 32-byte PSK. The code is normalized (trim +
-    /// lowercase) before derivation: pairing codes travel between machines by
-    /// hand (chat apps, notes) and pick up invisible whitespace — the #1 cause
-    /// of "handshake timeout" in the field.
-    public static func psk(fromCode code: String) -> Data {
-        let normalized = code
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+    /// Canonical form used for derivation: alphanumerics only, lowercased.
+    /// Codes travel between machines by hand (screen → keyboard, chat apps,
+    /// notes) and pick up whitespace, case changes and the display dash of
+    /// short tokens ("ABCD-EFGH" ≡ "abcdefgh") — none of that may change the
+    /// PSK. #1 field cause of "handshake timeout".
+    public static func normalize(_ code: String) -> String {
+        String(code.unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) })
             .lowercased()
+    }
+
+    /// HKDF-SHA256(normalized code) → 32-byte PSK.
+    public static func psk(fromCode code: String) -> Data {
+        let normalized = normalize(code)
         let key = HKDF<SHA256>.deriveKey(
             inputKeyMaterial: SymmetricKey(data: Data(normalized.utf8)),
             salt: salt,

@@ -21,12 +21,17 @@
 - **2026-07-03 — Ocultação de cursor via API privada aprovada (input-polish R17)**: `SetsCursorInBackground` (`CGSSetConnectionProperty` via `dlsym`) + `CGDisplayHideCursor` — mesma técnica de Deskflow/Barrier. Provado no spike T19 (macOS 26: símbolos resolvem, CGError=0). Fallback: seta parada-visível (warp-offscreen NÃO serve — clampa). Símbolos SEMPRE via `dlsym`, nunca linkados. App já é não-sandbox (tap com supressão), então API privada não muda o status de distribuição.
 - **2026-07-03 — Trava de cursor não confia só na dissociação (input-polish R18/R19)**: `CGAssociateMouseAndMouseCursorPosition(0)` é estado global volátil (cai em sleep/wake). Defesa em camadas: servidor re-warpa a cada move capturado; cliente tem watchdog (`CursorSentinel`, poll 250 ms, sem TCC novo); ambos re-aplicam em wake/screensaver/display via `SystemStateObserver`. Padrão confirmado nos dois pares maduros (Deskflow/lan-mouse re-warpam continuamente).
 
+## Decisões (cont. 2)
+
+- **2026-07-04 — discovery-pairing especificada** (viabilidade confirmada): descoberta Bonjour nativa (`NWListener.Service` + `NWBrowser`, `_crossdesk._udp`, zero deps) + pareamento por token curto (8 chars, ~40 bits) com rotação para segredo 128-bit via PAIR_SET/PAIR_ACK (0x05/0x06) dentro do túnel DTLS. Decisões do usuário: token curto+rotação, reconexão automática, fallback manual por IP mantido. Risco aceito: brute-force offline do token na janela de pareamento (documentar no PROTOCOL.md; PAKE elimina na Fase 4). Docs: `.specs/features/discovery-pairing/` (spec/context/design/tasks T29–T38).
+
 ## Pendências
 
 - [x] Golden vectors → `.specs/protocol/vectors/v0_1.txt` (provados por teste).
 - [ ] Spike T2 (CGEventPost fora da main thread + Esc em REMOTE) — valida na prática durante T15/UAT.
 - [ ] Pairing code em JSON plano → migrar para Keychain pós-MVP.
 - [x] ~~Assinatura ad-hoc: TCC re-pedindo após rebuild~~ — RESOLVIDO (beta.3): identidade self-signed "CrossDesk Dev" no keychain da máquina de build, make-app.sh auto-detecta (fallback ad-hoc). Cert Apple Developer real continua desejável p/ notarização (elimina o passo do xattr).
+- [ ] **discovery-pairing — planejada, não iniciada** (2026-07-04): tasks T29–T38 em `.specs/features/discovery-pairing/tasks.md`. Segredo rotacionado herda a pendência do Keychain (acima).
 - [ ] **input-polish — código completo (T19–T27), só falta UAT (T28)** (2026-07-03). 99 testes verdes, app assina OK. Falta rodar em 2 macs: invisibilidade visual, sleep-survival (`swift run conceal-spike --sleep-test`), momentum em apps, decisão do coalescing (dormente), latência p95. Detalhes em `.specs/features/input-polish/tasks.md` T28.
   - ~~Cursor visível parado na borda~~ → R17 (`CursorConcealer`, API privada `SetsCursorInBackground` provada no spike T19).
   - ~~Seta anda após standby/wake~~ → R18 (`CursorSentinel` watchdog) + R19 (`SystemStateObserver` reassert).

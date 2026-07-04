@@ -30,12 +30,34 @@ final class ConfigStoreTests: XCTestCase {
         config.role = .client
         config.serverHost = "192.168.1.10"
         config.port = 24801
-        config.pairingCode = "0123456789abcdef0123456789abcdef"
+        config.pairingCode = "ABCD-EFGH"
+        config.pairedSecret = "0123456789abcdef0123456789abcdef"
+        config.pairedServerName = "Mac Studio"
         config.edgeSide = .left
         config.deviceName = "MacBook do Patrick"
 
         try store.save(config)
         XCTAssertEqual(try store.load(), config)
+    }
+
+    func testConfigFromOlderBuildLoadsWithPairingDefaults() throws {
+        // A config written before discovery-pairing has no pairedSecret /
+        // pairedServerName keys — it must load with defaults, never throw
+        // (throwing would discard the user's pairing code, see AppConfig docs).
+        let url = tempDir.appendingPathComponent("nested/config.json")
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        let oldJSON = """
+        {"role":"client","edgeSide":"right","serverHost":"10.0.0.2","port":24800,
+         "pairingCode":"0123456789abcdef0123456789abcdef","deviceName":"Mac","concealCursor":true}
+        """
+        try Data(oldJSON.utf8).write(to: url)
+
+        let config = try store.load()
+        XCTAssertEqual(config.pairingCode, "0123456789abcdef0123456789abcdef")
+        XCTAssertEqual(config.pairedSecret, "")
+        XCTAssertEqual(config.pairedServerName, "")
     }
 
     func testCorruptFileThrows() throws {
