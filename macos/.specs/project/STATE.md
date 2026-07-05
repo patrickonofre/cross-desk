@@ -38,6 +38,7 @@
   - `Message.hello` e `FileChannelMessage.error`: truncagem de nome/mensagem por contagem de bytes (`utf8.prefix(N)`) podia cortar um caractere multi-byte ao meio (acento comum em nome de Mac). O lado receptor falha `String(data:encoding:.utf8)` e o `decodeAll` derruba o datagrama INTEIRO, não só o campo — silencioso. Fix: `WireStrings.utf8Prefix` (Sources/Protocol/Message.swift) recua byte a byte até achar um limite de escalar válido. Testes de regressão com "á" repetido no boundary exato (`MessageTests.testHelloNameTruncationNeverSplitsAMultiByteCharacter`, `FileChannelMessageTests.testErrorMessageTruncationNeverSplitsAMultiByteCharacter`).
   - `NetworkInfo.localIPv4Addresses()`: `String(cString:)` sobre `[CChar]` é a via deprecated (warning no build release) — trocado para a variante de ponteiro (`withUnsafeBufferPointer`).
   - `FileReceiver.handle`: `var item` sem mutação (warning) → `let`.
+- **2026-07-05 — beta.10 publicada (build 11), tag `v0.1.0-beta.10`**: bundle inclui, além dos fixes do code review acima, as duas features code-complete que nunca tinham ganhado build/tag próprios — file-transfer E1 (T39–T46) e layout-ux (T49–T56), ambas herdadas da beta.9 (build 10). É o "build novo" do passo 0 do roteiro [UAT-2026-07-06.md](UAT-2026-07-06.md) — UATs T38/T47/T57/T28 continuam pendentes (sessão de 2 macs), rodar contra este build.
 
 ## Pendências
 
