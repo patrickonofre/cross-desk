@@ -19,6 +19,9 @@ public final class ClientSession: @unchecked Sendable {
     /// PAIR_SET arrived: persist this secret before anything else (R29 —
     /// the transport only ACKs after this returns). On the transport queue.
     public var onPairSet: (@Sendable (String) -> Void)?
+    /// File-transfer control (CLIP_FILES/FILE_PULL, PROTOCOL.md §8) — the app
+    /// forwards these to the TransferCoordinator. On the transport queue.
+    public var onFileMessage: (@Sendable (Message) -> Void)?
 
     /// `endpoint`: Bonjour `.service` from discovery (R27) or `.hostPort` for
     /// the manual path (R32). Credentials (R30): `pairedSecret` leads when
@@ -69,6 +72,17 @@ public final class ClientSession: @unchecked Sendable {
         transport.start()
         observer.start()
         onState?(.waitingPeer)
+    }
+
+    /// Outbound control messages (CLIP_FILES announces) for the coordinator.
+    public func sendControl(_ messages: [Message]) {
+        transport.send(messages)
+    }
+
+    /// Resolved server host of the live connection — where the file channel
+    /// (§8) dials its TCP connection. Nil before the first handshake.
+    public func serverHost() -> String? {
+        transport.remoteHost()
     }
 
     public func stop() {
@@ -131,8 +145,13 @@ public final class ClientSession: @unchecked Sendable {
                 // Injected directly from the transport queue (design.md T2).
                 self.metrics.bump(.datagramsReceived)
                 for message in messages {
-                    self.metrics.bump(.injectedMessages)
-                    self.injector.apply(message)
+                    switch message {
+                    case .clipFiles, .filePull:
+                        self.onFileMessage?(message)
+                    default:
+                        self.metrics.bump(.injectedMessages)
+                        self.injector.apply(message)
+                    }
                 }
             }
         }

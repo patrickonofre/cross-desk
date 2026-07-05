@@ -27,6 +27,8 @@
 
 ## Pendências
 
+- [ ] **UAT consolidado marcado p/ 2026-07-06** — roteiro pronto em [project/UAT-2026-07-06.md](UAT-2026-07-06.md): bloco A = T38 (discovery-pairing), B = T47 (file-transfer), C = T28 (input-polish + p95 + decisões coalescing/reassert-park). Setup: build novo, `xattr -cr` na 2ª máquina, config.json limpo p/ testar pareamento do zero.
+- [ ] **file-transfer E1 — CODE-COMPLETE (T39–T46 ✅), falta UAT T47** (2026-07-05): stack inteira + UI no painel + wiring (coordinator/watcher por sessão; PSK segue rotação; cliente usa host resolvido). 151 testes verdes, app assina. UAT T47 em 2 macs: aceitações 1,2,4,7,8 do spec (3/5/6 já automatizadas) — **dá p/ juntar com T28 (input-polish) e T38 (discovery-pairing) numa sessão só**. Race conhecida: transferir durante rotação de pareamento falha 1× (janela ~2 s). Spikes soltos: T44 (promise-paste, opcional), T48 (drag real, gate E2).
 - [x] Golden vectors → `.specs/protocol/vectors/v0_1.txt` (provados por teste).
 - [ ] Spike T2 (CGEventPost fora da main thread + Esc em REMOTE) — valida na prática durante T15/UAT.
 - [ ] Pairing code em JSON plano → migrar para Keychain pós-MVP.
@@ -44,7 +46,8 @@
 - Notificações de wake/sessão (`NSWorkspace.didWake…`) chegam no `NSWorkspace.shared.notificationCenter`, **não** no `.default` — assinar no center errado = observer que nunca dispara.
 - App menubar-only (LSUIElement): usuário pode arrastar o status item pra fora e o macOS PERSISTE a remoção → app roda sem UI alcançável para sempre. `MenuBarExtra(isInserted:)` pinado + heal do flag no launch (T17).
 
-- `NWConnection` presa em `.preparing` (porta morta) nunca vira `.failed` sozinha — timeout de handshake é obrigatório em UDP/DTLS.
+- `Data.removeFirst`/slices deslocam `startIndex` — subscript absoluto (`data[0]`) trapa depois. Parser de stream: sempre indexar relativo a `startIndex` e compactar com `Data(dropFirst)`. (Pegou no `FileChannelDecoder`; testes de frame-inteiro-por-feed não pegam — só o teste byte-a-byte pegou.)
+- `NWConnection` presa em `.preparing` (porta morta) nunca vira `.failed` sozinha — timeout de handshake é obrigatório em UDP/DTLS (vale igual p/ TCP/TLS: `FileChannelConnection` reusa o mesmo timeout).
 - Enfileirar `send()` público (queue.async) de dentro de um bloco já na queue = mensagem sai depois do teardown. Métodos internos *OnQueue diretos.
 - **Confirmado na prática (beta.1→beta.2):** update de app ad-hoc quebra TCC nas duas máquinas — toggle aparece ligado em System Settings mas o preflight falha, e re-conceder NÃO regrava a entrada. Cura: `tccutil reset All dev.crossdesk.mac` + conceder de novo. Prevenção: identidade de assinatura estável.
 

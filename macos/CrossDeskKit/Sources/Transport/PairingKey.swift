@@ -12,6 +12,10 @@ import Security
 public enum PairingKey {
     static let salt = Data("crossdesk-v1".utf8)
     static let info = Data("dtls-psk".utf8)
+    /// HKDF info for the file-channel PSK (PROTOCOL.md §8) — domain
+    /// separation: the file channel never shares key material with the
+    /// input channel, even though both derive from the same code.
+    static let fileInfo = Data("tls-psk-file".utf8)
     public static let pskIdentity = "crossdesk"
 
     /// 32 lowercase hex chars = 128 bits of entropy. Used for the rotated
@@ -65,6 +69,16 @@ public enum PairingKey {
 
     /// HKDF-SHA256(normalized code) → 32-byte PSK.
     public static func psk(fromCode code: String) -> Data {
+        derive(code: code, info: info)
+    }
+
+    /// PSK for the TCP file channel (PROTOCOL.md §8): same code, different
+    /// HKDF info — independent key.
+    public static func filePSK(fromCode code: String) -> Data {
+        derive(code: code, info: fileInfo)
+    }
+
+    private static func derive(code: String, info: Data) -> Data {
         let normalized = normalize(code)
         let key = HKDF<SHA256>.deriveKey(
             inputKeyMaterial: SymmetricKey(data: Data(normalized.utf8)),

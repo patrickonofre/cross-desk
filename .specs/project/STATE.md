@@ -7,6 +7,8 @@
 - **2026-07-03 — Keycodes em USB HID Usage IDs** no fio (neutro entre CGKeyCode/scancode/evdev).
 - **2026-07-03 — Geometria independente por máquina** (protocolo §5): resolução/layout nunca trafegam; cliente detecta a própria borda de retorno (LEAVE_REQUEST 0x12). Vale para todas as implementações (Windows/Linux herdam o contrato).
 
+- **2026-07-04 — file-transfer antecipada** (decisão do usuário; era "ideia adiada"/não-objetivo v1). Staged: E1 clipboard de arquivos (⌘C/⌘V, API pública), E2 drag real só se spike S1 provar (Synergy falhou nisso; Deskflow removeu). Destino fallback: `~/Downloads/CrossDesk/`. Specs: `macos/.specs/features/file-transfer/`.
+
 ## Bloqueios
 
 - Nenhum.

@@ -38,6 +38,9 @@ public final class ServerSession: @unchecked Sendable {
     /// Pairing rotation completed (R29): persist this secret — from now on the
     /// listener only accepts handshakes derived from it. On the transport queue.
     public var onPaired: (@Sendable (String) -> Void)?
+    /// File-transfer control (CLIP_FILES, PROTOCOL.md §8) — the app forwards
+    /// these to the TransferCoordinator. On the session queue.
+    public var onFileMessage: (@Sendable (Message) -> Void)?
 
     /// `pairingCode`: short token while unpaired, rotated secret once paired —
     /// the caller decides which (and sets `pairing` accordingly).
@@ -77,6 +80,11 @@ public final class ServerSession: @unchecked Sendable {
         try transport.start()
         observer.start()
         onState?(.waitingPeer)
+    }
+
+    /// Outbound control messages (CLIP_FILES/FILE_PULL) for the coordinator.
+    public func sendControl(_ messages: [Message]) {
+        transport.send(messages)
     }
 
     public func stop() {
@@ -142,6 +150,10 @@ public final class ServerSession: @unchecked Sendable {
             onState?(.waitingPeer)
         case let .messages(messages):
             for message in messages {
+                if case .clipFiles = message {
+                    onFileMessage?(message)
+                    continue
+                }
                 // Client crossed its return edge (client-side detection — it
                 // owns its own topology). May arrive duplicated (UDP retry);
                 // once LOCAL, extras are ignored.

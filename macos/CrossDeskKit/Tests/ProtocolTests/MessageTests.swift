@@ -26,6 +26,10 @@ final class MessageTests: XCTestCase {
          .scrollContinuous(dx: 0.0, dy: 2.0, phase: .changed, momentum: .none),
          "230a0000000000000000400200"),
         ("key", .key(hidUsage: 0x0004, pressed: true), "300300040001"),
+        ("clip_files",
+         .clipFiles(transferId: 1, itemCount: 2, totalBytes: 1_048_576),
+         "50100001000000020000000000100000000000"),
+        ("file_pull", .filePull(transferId: 1), "51040001000000"),
     ]
 
     func testGoldenVectorsEncode() {
@@ -63,6 +67,8 @@ final class MessageTests: XCTestCase {
             .scrollContinuous(dx: -12.5, dy: 3.0, phase: .began, momentum: .none),
             .scrollContinuous(dx: 0.0, dy: -8.0, phase: .ended, momentum: .began),
             .key(hidUsage: 0xE3, pressed: false),
+            .clipFiles(transferId: 0xDEAD_BEEF, itemCount: 0, totalBytes: UInt64.max),
+            .filePull(transferId: 42),
         ]
         for message in messages {
             XCTAssertEqual(try Message.decodeAll(message.encoded()), [message])

@@ -13,11 +13,15 @@ final class AppState: ObservableObject {
     @Published var discoveredServers: [DiscoveredServer] = []
     /// Local Network permission looks denied (browser stuck waiting, R33).
     @Published var localNetworkDenied = false
+    /// File transfer status for the panel section (file-transfer T46).
+    @Published var transferState: TransferUIState = .idle
 
     private let store = ConfigStore()
     private let browser = ServerBrowser()
     private var serverSession: ServerSession?
     private var clientSession: ClientSession?
+    private var transferCoordinator: TransferCoordinator?
+    private var pasteboardWatcher: PasteboardWatcher?
 
     init() {
         var loaded = (try? store.load()) ?? AppConfig()
@@ -130,6 +134,8 @@ final class AppState: ObservableObject {
                 guard let self else { return }
                 self.config.pairedSecret = secret
                 self.saveConfig()
+                // The file channel follows the rotation (PROTOCOL.md §6/§8).
+                self.transferCoordinator?.updateFilePSK(PairingKey.filePSK(fromCode: secret))
                 Log.app.info("server paired — rotated secret persisted")
             }
         }
@@ -137,6 +143,7 @@ final class AppState: ObservableObject {
             try session.start()
             serverSession = session
             running = true
+            startFileTransfer(role: .server, code: paired ? config.pairedSecret : config.pairingCode)
             updateBrowsing()
         } catch {
             Log.app.error("start failed: capture start threw \(String(describing: error), privacy: .public)")
@@ -192,14 +199,28 @@ final class AppState: ObservableObject {
             deviceName: config.deviceName,
             conceal: config.concealCursor
         )
-        session.onState = { [weak self] state in
-            Task { @MainActor in self?.sessionState = state }
+        session.onState = { [weak self, weak session] state in
+            Task { @MainActor in
+                guard let self else { return }
+                self.sessionState = state
+                // The file channel needs the RESOLVED server host (a Bonjour
+                // endpoint has none until connected) — start it on first connect.
+                if case .connected = state, self.transferCoordinator == nil,
+                   let session, let host = session.serverHost() {
+                    self.startFileTransfer(
+                        role: .client(serverHost: host),
+                        code: self.paired ? self.config.pairedSecret : self.config.pairingCode
+                    )
+                }
+            }
         }
         session.onPairSet = { [weak self] secret in
             Task { @MainActor in
                 guard let self else { return }
                 self.config.pairedSecret = secret
                 self.saveConfig()
+                // The file channel follows the rotation (PROTOCOL.md §6/§8).
+                self.transferCoordinator?.updateFilePSK(PairingKey.filePSK(fromCode: secret))
                 Log.app.info("client paired — rotated secret persisted")
             }
         }
@@ -209,9 +230,81 @@ final class AppState: ObservableObject {
         updateBrowsing()
     }
 
+    // MARK: - File transfer (file-transfer T46)
+
+    private func startFileTransfer(role: TransferRole, code: String) {
+        let fm = FileManager.default
+        guard let caches = fm.urls(for: .cachesDirectory, in: .userDomainMask).first,
+              let downloads = fm.urls(for: .downloadsDirectory, in: .userDomainMask).first
+        else { return }
+        let coordinator = TransferCoordinator(
+            role: role,
+            port: config.port,
+            filePSK: PairingKey.filePSK(fromCode: code),
+            policy: TransferPolicy(
+                stagingRoot: caches.appendingPathComponent("CrossDesk/incoming"),
+                downloadsDir: downloads.appendingPathComponent("CrossDesk")
+            )
+        )
+        coordinator.onUIState = { [weak self] state in
+            Task { @MainActor in
+                self?.transferState = state
+                if case let .done(_, urls, movedToDownloads) = state,
+                   movedToDownloads, !urls.isEmpty {
+                    NSWorkspace.shared.activateFileViewerSelecting(urls)
+                }
+            }
+        }
+        if let serverSession {
+            coordinator.sendControl = { [weak serverSession] in serverSession?.sendControl($0) }
+            serverSession.onFileMessage = { [weak coordinator] in coordinator?.handleControl($0) }
+        } else if let clientSession {
+            coordinator.sendControl = { [weak clientSession] in clientSession?.sendControl($0) }
+            clientSession.onFileMessage = { [weak coordinator] in coordinator?.handleControl($0) }
+        }
+        do {
+            try coordinator.start()
+        } catch {
+            // Input keeps working without the file channel — degrade quietly.
+            Log.app.error("file transfer unavailable: \(String(describing: error), privacy: .public)")
+            return
+        }
+        let watcher = PasteboardWatcher()
+        watcher.onFilesCopied = { [weak coordinator] urls in
+            coordinator?.announceLocalCopy(roots: urls)
+        }
+        watcher.start()
+        transferCoordinator = coordinator
+        pasteboardWatcher = watcher
+    }
+
+    private func stopFileTransfer() {
+        pasteboardWatcher?.stop()
+        pasteboardWatcher = nil
+        transferCoordinator?.stop()
+        transferCoordinator = nil
+        transferState = .idle
+    }
+
+    func transferReceiveNow() {
+        transferCoordinator?.receiveNow()
+    }
+
+    func transferCancel() {
+        transferCoordinator?.cancelActive()
+    }
+
+    func transferDismiss() {
+        if case .pendingOffer = transferState {
+            transferCoordinator?.dismissPendingOffer()
+        }
+        transferState = .idle
+    }
+
     // MARK: - Shared
 
     func stop() {
+        stopFileTransfer()
         serverSession?.stop()
         clientSession?.stop()
         serverSession = nil

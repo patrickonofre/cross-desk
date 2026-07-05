@@ -16,6 +16,10 @@ struct MenuBarView: View {
             Divider()
             rolePicker
             roleFields
+            if appState.transferState != .idle {
+                Divider()
+                transferSection
+            }
             Divider()
             optionsSection
             Divider()
@@ -298,6 +302,102 @@ struct MenuBarView: View {
             .padding(.top, 4)
         }
         .font(.caption)
+    }
+
+    // MARK: - File transfer (file-transfer T46)
+
+    @ViewBuilder
+    private var transferSection: some View {
+        switch appState.transferState {
+        case .idle:
+            EmptyView()
+
+        case let .pendingOffer(_, items, totalBytes):
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: "tray.and.arrow.down")
+                    .foregroundStyle(.blue)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(items) \(items == 1 ? "arquivo" : "arquivos") (\(Self.bytesText(totalBytes)))")
+                        .font(.caption)
+                    Text("do outro Mac — receber em Downloads/CrossDesk")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Receber") { appState.transferReceiveNow() }
+                    .font(.caption)
+                dismissButton
+            }
+
+        case let .receiving(_, receivedBytes, totalBytes):
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text("Recebendo arquivos…")
+                        .font(.caption)
+                    Spacer()
+                    Text("\(Self.bytesText(receivedBytes)) / \(Self.bytesText(totalBytes))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Button("Cancelar") { appState.transferCancel() }
+                        .font(.caption)
+                }
+                if totalBytes > 0 {
+                    ProgressView(value: Double(receivedBytes), total: Double(totalBytes))
+                } else {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+
+        case .sending:
+            HStack(spacing: 6) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Enviando arquivos…")
+                    .font(.caption)
+                Spacer()
+                Button("Cancelar") { appState.transferCancel() }
+                    .font(.caption)
+            }
+
+        case let .done(_, urls, movedToDownloads):
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                Text(movedToDownloads
+                     ? "Recebido em Downloads/CrossDesk"
+                     : (urls.isEmpty ? "Envio concluído" : "Arquivos prontos — ⌘V para colar"))
+                    .font(.caption)
+                Spacer()
+                dismissButton
+            }
+
+        case let .failed(_, reason):
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
+                Text("Transferência falhou: \(reason)")
+                    .font(.caption)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer()
+                dismissButton
+            }
+        }
+    }
+
+    private var dismissButton: some View {
+        Button {
+            appState.transferDismiss()
+        } label: {
+            Image(systemName: "xmark")
+        }
+        .buttonStyle(.borderless)
+        .help("Dispensar")
+    }
+
+    private static func bytesText(_ bytes: UInt64) -> String {
+        ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
     }
 
     // MARK: - Shared sections

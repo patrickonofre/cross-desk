@@ -31,6 +31,6 @@
 
 ## Ideias adiadas
 
-- Drag-and-drop de arquivos entre máquinas.
+- ~~Drag-and-drop de arquivos entre máquinas~~ — **antecipado para a Fase 1** (feature `file-transfer`, 2026-07-04): E1 = ⌘C/⌘V de arquivos mac↔mac; E2 = drag real condicionado a spike. Specs em `macos/.specs/features/file-transfer/`.
 - Android/iOS como cliente.
 - Modo compatibilidade com protocolo Synergy/Barrier (avaliar demanda).

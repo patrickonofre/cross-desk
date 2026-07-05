@@ -39,6 +39,13 @@ public enum Message: Equatable, Sendable {
     /// High-fidelity trackpad scroll: pixel deltas + gesture/momentum phase (R20).
     case scrollContinuous(dx: Float, dy: Float, phase: ScrollPhase, momentum: MomentumPhase)
     case key(hidUsage: UInt16, pressed: Bool)
+    /// Both directions: this machine's pasteboard now holds files. Metadata
+    /// only — materialization is the receiver's decision (PROTOCOL.md §8).
+    /// A new announcement from the same side replaces the previous one.
+    case clipFiles(transferId: UInt32, itemCount: UInt32, totalBytes: UInt64)
+    /// S→C: server wants the files the client announced; the client opens the
+    /// TCP file channel and pushes them (PROTOCOL.md §8).
+    case filePull(transferId: UInt32)
 
     enum WireType: UInt8 {
         case hello = 0x01
@@ -55,6 +62,8 @@ public enum Message: Equatable, Sendable {
         case scroll = 0x22
         case scrollContinuous = 0x23
         case key = 0x30
+        case clipFiles = 0x50
+        case filePull = 0x51
     }
 }
 
@@ -126,6 +135,14 @@ extension Message {
             payload.appendLE(hidUsage)
             payload.append(pressed ? 1 : 0)
             return (.key, payload)
+        case let .clipFiles(transferId, itemCount, totalBytes):
+            payload.appendLE(transferId)
+            payload.appendLE(itemCount)
+            payload.appendLE(totalBytes)
+            return (.clipFiles, payload)
+        case let .filePull(transferId):
+            payload.appendLE(transferId)
+            return (.filePull, payload)
         }
     }
 
@@ -210,13 +227,21 @@ extension Message {
         case .key:
             guard let usage = try? reader.u16(), let pressed = try? reader.u8() else { throw invalid() }
             return .key(hidUsage: usage, pressed: pressed != 0)
+        case .clipFiles:
+            guard let transferId = try? reader.u32(), let itemCount = try? reader.u32(),
+                  let totalBytes = try? reader.u64() else { throw invalid() }
+            return .clipFiles(transferId: transferId, itemCount: itemCount, totalBytes: totalBytes)
+        case .filePull:
+            guard let transferId = try? reader.u32() else { throw invalid() }
+            return .filePull(transferId: transferId)
         }
     }
 }
 
 // MARK: - Little-endian helpers
 
-private struct Reader {
+/// Shared by Message (§2 framing) and FileChannelMessage (§8 framing).
+struct Reader {
     private let data: Data
     private var offset: Int
 
@@ -237,6 +262,22 @@ private struct Reader {
         let lo = try u8()
         let hi = try u8()
         return UInt16(lo) | (UInt16(hi) << 8)
+    }
+
+    mutating func u32() throws -> UInt32 {
+        var value: UInt32 = 0
+        for shift in stride(from: 0, to: 32, by: 8) {
+            value |= UInt32(try u8()) << UInt32(shift)
+        }
+        return value
+    }
+
+    mutating func u64() throws -> UInt64 {
+        var value: UInt64 = 0
+        for shift in stride(from: 0, to: 64, by: 8) {
+            value |= UInt64(try u8()) << UInt64(shift)
+        }
+        return value
     }
 
     mutating func f32() throws -> Float {
@@ -263,6 +304,12 @@ extension Data {
     mutating func appendLE(_ value: UInt32) {
         for shift in stride(from: 0, to: 32, by: 8) {
             append(UInt8((value >> UInt32(shift)) & 0xFF))
+        }
+    }
+
+    mutating func appendLE(_ value: UInt64) {
+        for shift in stride(from: 0, to: 64, by: 8) {
+            append(UInt8((value >> UInt64(shift)) & 0xFF))
         }
     }
 }

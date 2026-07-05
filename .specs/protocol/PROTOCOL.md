@@ -50,6 +50,8 @@ Cada datagrama DTLS carrega **uma ou mais mensagens** concatenadas:
 | 0x23 | SCROLL_CONTINUOUS | S→C | `dx f32` · `dy f32` (pixels; positivo = direita/baixo) · `phase u8` (0=none 1=began 2=changed 3=ended 4=cancelled) · `momentum u8` (0=none 1=began 2=changed 3=ended) — scroll de trackpad de alta fidelidade; fases repassadas da origem (momentum não é sintetizado) |
 | 0x30 | KEY | S→C | `hid_usage u16` (USB HID Usage ID, página 0x07) · `pressed u8` (0/1) |
 | 0x40 | CLIPBOARD | ambas | reservado (Fase 4) |
+| 0x50 | CLIP_FILES | ambas | `transfer_id u32` · `item_count u32` · `total_bytes u64` — anúncio: o pasteboard local desta máquina contém arquivos. Metadata apenas; materialização é decisão do receptor (§8). Novo anúncio do mesmo lado invalida o anterior |
+| 0x51 | FILE_PULL | S→C | `transfer_id u32` — servidor quer materializar arquivos anunciados pelo cliente; cliente abre o canal TCP (§8) e envia (mode=push) |
 
 ## 4. Keycodes
 
@@ -69,7 +71,7 @@ Cada datagrama DTLS carrega **uma ou mais mensagens** concatenadas:
 - ENTER carrega posição normalizada (sobre o bounding box da união das telas do cliente) + a borda de entrada, para o cursor "nascer" no ponto correspondente. A borda de entrada é também a borda de retorno.
 - **A borda de retorno é detectada no CLIENTE** (dono da verdade sobre a posição do seu cursor): ao cruzar a borda externa de retorno, envia LEAVE_REQUEST com a posição normalizada de saída; o servidor reposiciona seu cursor físico e responde LEAVE. LEAVE_REQUEST pode se repetir a cada movimento adicional "para fora" enquanto o LEAVE não chega — retry natural sobre UDP; servidor idempotente (ignora quando já está em LOCAL).
 - Após LEAVE, cliente DEVE soltar (key-up sintético) toda tecla que estiver logicamente pressionada — evita modificador preso.
-- Eventos de input fluem S→C; LEAVE_REQUEST é a única mensagem de controle C→S (além de HELLO/HEARTBEAT/BYE).
+- Eventos de input fluem S→C; mensagens de controle C→S: LEAVE_REQUEST, HELLO, HEARTBEAT, BYE, PAIR_ACK e CLIP_FILES (anúncio de arquivos, §8).
 - Sem ACK por evento (UDP é lossy por design; perda de MOUSE_MOVE é tolerável). KEY e MOUSE_BUTTON: v0.1 aceita perda; se na prática incomodar, v0.2 adiciona canal confiável só para eventos discretos (registrado como risco).
 
 ## 6. Pareamento (rotação token → segredo)
@@ -90,7 +92,41 @@ Análise de falha completa (perda de SET/ACK, queda no meio): design da implemen
 - TXT record: `proto=<proto_version>` (decimal). **Nada sensível no anúncio** (sem token, sem fingerprint, sem segredo). O TXT é conveniência de UI; NENHUMA decisão de segurança pode se basear nele — a autenticação é exclusivamente o handshake DTLS-PSK.
 - Cliente navega o mesmo tipo de serviço e conecta no endpoint resolvido. Fallback manual (host+porta digitados) DEVE continuar existindo (redes com mDNS bloqueado).
 
-## 8. Versionamento
+## 8. Canal de arquivos (TCP)
+
+Transferência de arquivos (anunciada por CLIP_FILES/FILE_PULL no canal principal) usa uma conexão separada:
+
+- **TCP na mesma porta numérica** do UDP (§1). Listener TCP ativo apenas enquanto o servidor está ativo. Conexão aberta **por transferência** e fechada ao final (TRANSFER_DONE/CANCEL/ERROR).
+- Criptografia obrigatória: **TLS 1.2 com PSK**, mesma cipher suite do §1 (`TLS_PSK_WITH_AES_128_GCM_SHA256`), identidade `"crossdesk"`. PSK derivado do MESMO código vigente (token ou segredo, §1) porém com **`info="tls-psk-file"`** no HKDF — *domain separation*: a chave do canal de arquivos é independente da chave do canal de input. Sem modo plaintext.
+- **TCP sempre iniciado pelo cliente** (simetria com §1: servidor escuta, cliente conecta). Cliente recebe arquivos conectando e pedindo (`mode=request`); servidor recebe enviando FILE_PULL no canal principal — o cliente então conecta e envia (`mode=push`).
+- Framing próprio (difere do §2: `length` é **u32** — chunks de dados excedem u16):
+
+```
++--------+--------+----------------+
+| type   | length | payload        |
+| u8     | u32 LE | length bytes   |
++--------+--------+----------------+
+```
+
+| type | Nome | Payload |
+|------|------|---------|
+| 0x01 | FILE_HELLO | `proto u16` · `transfer_id u32` · `mode u8` (0=push: quem conectou envia; 1=request: quem conectou pede). Primeira mensagem, enviada por quem conectou |
+| 0x02 | ITEM_META | `kind u8` (0=arquivo 1=dir 2=symlink) · `size u64` · `path_len u16` · `path utf8` · se kind=2: `target_len u16` · `target utf8` |
+| 0x03 | DATA | bytes do item corrente (chunk ≤ 64 KiB); pertence ao último ITEM_META |
+| 0x04 | ITEM_DONE | arquivo: `sha256 (32 B)` do conteúdo; dir/symlink: payload vazio |
+| 0x05 | TRANSFER_DONE | vazio — todos os itens enviados |
+| 0x06 | CANCEL | `origin u8` (0=emissor 1=receptor); qualquer lado, a qualquer momento |
+| 0x07 | ERROR | `code u8` · `msg_len u16` · `msg utf8` — fatal; fecha a conexão |
+
+Regras:
+
+- `path` é relativo, separador `/`. Receptor DEVE rejeitar componente `..`, caminho absoluto e bytes NUL (ERROR, nunca escrever fora do destino).
+- Symlink: `target` gravado verbatim; receptor NUNCA resolve/segue o target ao escrever.
+- Receptor valida o SHA-256 de cada arquivo; divergência → item descartado + ERROR. Escrita atômica (temporário + rename) é obrigação do receptor: arquivo parcial nunca fica visível.
+- Tipo desconhecido no canal TCP = erro de protocolo (ERROR + fecha) — diferente do §2; a versão deste canal é negociada pelo `proto` do FILE_HELLO.
+- `transfer_id` identifica o anúncio (CLIP_FILES) que originou a transferência; gerado por quem anuncia.
+
+## 9. Versionamento
 
 - `proto_version` u16: v0.1 = `1`. Incrementa a cada mudança incompatível.
 - HELLO/HELLO_ACK negociam o mínimo comum; sem versão comum → BYE.
@@ -102,3 +138,4 @@ Análise de falha completa (perda de SET/ACK, queda no meio): design da implemen
 - v0.1 (2026-07-03): geometria independente por máquina — ENTER ganha `edge u8`; nova mensagem LEAVE_REQUEST (0x12, C→S); borda de retorno detectada no cliente (antes: cursor virtual simulado no servidor — causava drift quando as resoluções diferiam). Golden vectors regenerados.
 - v0.1 (2026-07-03): nova mensagem SCROLL_CONTINUOUS (0x23, S→C) para scroll de trackpad de alta fidelidade (pixels + fases). `proto_version` inalterado (=1): mensagem de tipo novo é ignorável por decoders antigos (§2), então é adição compatível. Golden vectors acrescidos.
 - v0.1 (2026-07-04): pareamento por token curto + rotação — §1 reescrito (token 8 chars → segredo 128-bit via túnel), novas mensagens PAIR_SET (0x05, S→C) e PAIR_ACK (0x06, C→S), novo §6 (regras da rotação) e §7 (descoberta Bonjour `_crossdesk._udp`). `proto_version` inalterado (=1): tipos novos ignoráveis; cliente antigo fica em modo token (compatível). Golden vectors `pair_set`/`pair_ack` acrescidos.
+- v0.1 (2026-07-05): canal de arquivos — novas mensagens CLIP_FILES (0x50, ambas) e FILE_PULL (0x51, S→C) na tabela §3, novo **§8 Canal de arquivos** (TCP + TLS-PSK com `info="tls-psk-file"`, framing length u32, mensagens 0x01–0x07 próprias), Versionamento renumerado §8→§9. `proto_version` inalterado (=1): tipos DTLS novos são ignoráveis (§2) — build antigo simplesmente não transfere arquivos; o canal TCP negocia versão própria no FILE_HELLO. Golden vectors `clip_files`/`file_pull`/`fc_*` acrescidos.

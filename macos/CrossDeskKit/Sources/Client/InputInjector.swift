@@ -101,8 +101,9 @@ public final class InputInjector: @unchecked Sendable {
             postScrollContinuous(dx: Double(dx), dy: Double(dy), phase: phase, momentum: momentum)
         case let .key(hidUsage, pressed):
             postKey(hidUsage: hidUsage, isDown: pressed)
-        case .hello, .helloAck, .heartbeat, .bye, .leaveRequest, .pairSet, .pairAck:
-            break // transport-level / C→S only, never reaches the injector
+        case .hello, .helloAck, .heartbeat, .bye, .leaveRequest, .pairSet, .pairAck,
+             .clipFiles, .filePull:
+            break // transport/file-transfer level, never reaches the injector
         }
     }
 

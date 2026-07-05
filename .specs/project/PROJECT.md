@@ -16,7 +16,7 @@ Software KVM (compartilhamento de teclado e mouse via rede, sem vídeo) multipla
 - Compartilhamento de vídeo/tela.
 - Suporte a Android/iOS (futuro possível).
 - Compatibilidade de protocolo com Synergy/Barrier/Deskflow (protocolo próprio, moderno).
-- Arrastar arquivos entre máquinas (clipboard de texto/imagem sim, drag-and-drop de arquivos depois).
+- ~~Arrastar arquivos entre máquinas~~ — revisto em 2026-07-04: compartilhamento de arquivos antecipado (feature `file-transfer`: ⌘C/⌘V primeiro, drag real condicionado a spike). Clipboard de texto/imagem segue na Fase 4.
 
 ## Decisão de stack
 

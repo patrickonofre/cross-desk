@@ -22,3 +22,19 @@ key           KEY(hid_usage=0x0004, pressed=1)              300300040001
 # Compound datagram: ENTER + MOUSE_MOVE + KEY-down + KEY-up concatenated
 # (framing test — one datagram, many messages)
 compound      ENTER(0.0,0.5,left)+MOVE(5.0,5.0)+KEY(0x04,1)+KEY(0x04,0) 100900000000000000003f002008000000a0400000a040300300040001300300040000
+
+# File transfer — control messages on the main (DTLS) channel, §2 framing (length u16)
+clip_files    CLIP_FILES(transfer_id=1, item_count=2, total_bytes=1048576) 50100001000000020000000000100000000000
+file_pull     FILE_PULL(transfer_id=1)                      51040001000000
+
+# File transfer — file channel (TCP, PROTOCOL.md §8): OWN framing, length is u32 LE.
+# fc_* vectors use the 5-byte header (type u8 · length u32), NOT the §2 header.
+fc_hello            FILE_HELLO(proto=1, transfer_id=1, mode=0/push)   010700000001000100000000
+fc_item_meta        ITEM_META(kind=0/file, size=11, path="docs/a.txt") 0215000000000b000000000000000a00646f63732f612e747874
+fc_item_meta_link   ITEM_META(kind=2/symlink, size=0, path="ln", target="a.txt") 021400000002000000000000000002006c6e0500612e747874
+fc_data             DATA("hello")                                     030500000068656c6c6f
+fc_item_done        ITEM_DONE(sha256("hello"))                        04200000002cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824
+fc_item_done_empty  ITEM_DONE() for dir/symlink                       0400000000
+fc_transfer_done    TRANSFER_DONE                                     0500000000
+fc_cancel           CANCEL(origin=0/sender)                           060100000000
+fc_error            ERROR(code=1, msg="disk full")                    070c0000000109006469736b2066756c6c
