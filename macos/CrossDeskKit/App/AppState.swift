@@ -15,6 +15,12 @@ final class AppState: ObservableObject {
     @Published var localNetworkDenied = false
     /// File transfer status for the panel section (file-transfer T46).
     @Published var transferState: TransferUIState = .idle
+    /// Client only (layout-ux R37): return edge from the last ENTER — where
+    /// the desk canvas pins the server tile. Nil until the first crossing of
+    /// the current session.
+    @Published var clientReturnEdge: EdgeSide?
+    /// Client only (layout-ux R38): the cursor is currently on this machine.
+    @Published var clientFocused = false
 
     private let store = ConfigStore()
     private let browser = ServerBrowser()
@@ -127,7 +133,12 @@ final class AppState: ObservableObject {
             conceal: config.concealCursor
         )
         session.onState = { [weak self] state in
-            Task { @MainActor in self?.sessionState = state }
+            Task { @MainActor in
+                guard let self else { return }
+                self.sessionState = state
+                // First real handoff kills the crossing hint forever (R39).
+                if case .controllingRemote = state { self.markFirstCrossing() }
+            }
         }
         session.onPaired = { [weak self] secret in
             Task { @MainActor in
@@ -224,6 +235,20 @@ final class AppState: ObservableObject {
                 Log.app.info("client paired — rotated secret persisted")
             }
         }
+        // Desk canvas/mini-map feed (layout-ux R37/R38).
+        clientReturnEdge = nil
+        clientFocused = false
+        session.onEnter = { [weak self] edge in
+            Task { @MainActor in
+                guard let self else { return }
+                self.clientReturnEdge = edge
+                self.clientFocused = true
+                self.markFirstCrossing()
+            }
+        }
+        session.onLeave = { [weak self] in
+            Task { @MainActor in self?.clientFocused = false }
+        }
         session.start()
         clientSession = session
         running = true
@@ -311,7 +336,60 @@ final class AppState: ObservableObject {
         clientSession = nil
         running = false
         sessionState = .stopped
+        clientFocused = false
         updateBrowsing()
+    }
+
+    // MARK: - Desk UI (layout-ux)
+
+    /// R38: visual phase for the desk canvas and mini-map. The server's
+    /// `connected` means the cursor is local (REMOTE is its own state); the
+    /// client derives focus from ENTER/LEAVE.
+    var deskPhase: DeskPhase {
+        DeskModel.phase(
+            sessionState: sessionState,
+            paired: paired,
+            focusedHere: config.role == .server ? true : clientFocused
+        )
+    }
+
+    /// Peer name for the desk tile: the HELLO name when the session has one,
+    /// the remembered server otherwise.
+    var peerName: String {
+        switch sessionState {
+        case let .connected(peer), let .controllingRemote(peer):
+            if peer != "servidor" { return peer }
+        default:
+            break
+        }
+        if config.role == .client && !config.pairedServerName.isEmpty {
+            return config.pairedServerName
+        }
+        return "Outro Mac"
+    }
+
+    /// R39: one-time directional hint. Server-side only — pushing the cursor
+    /// through the edge is an action on the machine that owns the keyboard.
+    var crossingHint: String? {
+        guard config.role == .server else { return nil }
+        return DeskModel.crossingHint(
+            phase: deskPhase,
+            edge: config.edgeSide,
+            firstCrossingDone: config.firstCrossingDone
+        )
+    }
+
+    /// R41: menubar icon mirrors where the input goes.
+    var menuBarSymbol: String {
+        if case .controllingRemote = sessionState { return "cursorarrow.motionlines" }
+        return running ? "display.2.fill" : "display.2"
+    }
+
+    /// R39: the hint dies at the first real handoff, forever (persisted).
+    func markFirstCrossing() {
+        guard !config.firstCrossingDone else { return }
+        config.firstCrossingDone = true
+        saveConfig()
     }
 
     /// Accessibility/Input Monitoring grants only take effect on a fresh

@@ -23,10 +23,13 @@
 
 ## Decisões (cont. 2)
 
+- **2026-07-05 — layout-ux especificada e aprovada pelo usuário**: UX espacial no lugar do formulário — mini-mapa vivo no painel, janela "Telas" com monitores locais reais (`Displays` + `CGDisplayIsBuiltin`) e peer como tile abstrato arrastável (4 lados → `edgeSide`), estados vivos (foco/travessia/transferência), ícone dinâmico. Pesquisa: UC (travessia = onboarding), Synergy 3 (canvas livre), grade Synergy1/Deskflow = anti-padrão (#4173). Zero mudança de protocolo (§5 vira feature: peer abstrato). R35–R42 em `.specs/features/layout-ux/`. Mockup interativo apresentado na sessão. Ideia adiada: canvas bilateral em escala (exigiria geometria no fio).
+
 - **2026-07-04 — discovery-pairing especificada** (viabilidade confirmada): descoberta Bonjour nativa (`NWListener.Service` + `NWBrowser`, `_crossdesk._udp`, zero deps) + pareamento por token curto (8 chars, ~40 bits) com rotação para segredo 128-bit via PAIR_SET/PAIR_ACK (0x05/0x06) dentro do túnel DTLS. Decisões do usuário: token curto+rotação, reconexão automática, fallback manual por IP mantido. Risco aceito: brute-force offline do token na janela de pareamento (documentar no PROTOCOL.md; PAKE elimina na Fase 4). Docs: `.specs/features/discovery-pairing/` (spec/context/design/tasks T29–T38).
 
 ## Pendências
 
+- [ ] **layout-ux — CODE-COMPLETE (T49–T56 ✅), falta UAT T57** (2026-07-05): DeskModel (projeção/snap/fases, unit) + janela "Telas" (canvas real + tile do peer arrastável) + mini-mapa no painel + ícone dinâmico + coach-mark R39 + a11y inline. 166 testes verdes (+15), app assina. UAT T57 em 2 macs (aceitações R35–R41 + Accessibility Inspector) — **juntar com a sessão consolidada de 2026-07-06** (T28/T38/T47). Veto pendente do usuário no UAT: símbolo `cursorarrow.motionlines` p/ REMOTE.
 - [ ] **UAT consolidado marcado p/ 2026-07-06** — roteiro pronto em [project/UAT-2026-07-06.md](UAT-2026-07-06.md): bloco A = T38 (discovery-pairing), B = T47 (file-transfer), C = T28 (input-polish + p95 + decisões coalescing/reassert-park). Setup: build novo, `xattr -cr` na 2ª máquina, config.json limpo p/ testar pareamento do zero.
 - [ ] **file-transfer E1 — CODE-COMPLETE (T39–T46 ✅), falta UAT T47** (2026-07-05): stack inteira + UI no painel + wiring (coordinator/watcher por sessão; PSK segue rotação; cliente usa host resolvido). 151 testes verdes, app assina. UAT T47 em 2 macs: aceitações 1,2,4,7,8 do spec (3/5/6 já automatizadas) — **dá p/ juntar com T28 (input-polish) e T38 (discovery-pairing) numa sessão só**. Race conhecida: transferir durante rotação de pareamento falha 1× (janela ~2 s). Spikes soltos: T44 (promise-paste, opcional), T48 (drag real, gate E2).
 - [x] Golden vectors → `.specs/protocol/vectors/v0_1.txt` (provados por teste).

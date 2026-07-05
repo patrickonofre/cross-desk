@@ -60,6 +60,26 @@ final class ConfigStoreTests: XCTestCase {
         XCTAssertEqual(config.pairedServerName, "")
     }
 
+    func testConfigWithoutFirstCrossingDoneLoadsFalse() throws {
+        // Key added by layout-ux (T51) — older configs must load with false,
+        // and true must survive a save/load round trip.
+        let url = tempDir.appendingPathComponent("nested/config.json")
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        let oldJSON = """
+        {"role":"server","edgeSide":"right","serverHost":"","port":24800,
+         "pairingCode":"AAAA-BBBB","deviceName":"Mac","concealCursor":true}
+        """
+        try Data(oldJSON.utf8).write(to: url)
+        XCTAssertFalse(try store.load().firstCrossingDone)
+
+        var config = try store.load()
+        config.firstCrossingDone = true
+        try store.save(config)
+        XCTAssertTrue(try store.load().firstCrossingDone)
+    }
+
     func testCorruptFileThrows() throws {
         let url = tempDir.appendingPathComponent("nested/config.json")
         try FileManager.default.createDirectory(

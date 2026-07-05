@@ -22,7 +22,9 @@ struct CrossDeskApp: App {
             MenuBarView()
                 .environmentObject(appState)
         } label: {
-            Image(systemName: appState.running ? "display.2.fill" : "display.2")
+            // R41: the icon tells where the input goes even with the panel
+            // closed (cursor-with-motion-lines while controlling the peer).
+            Image(systemName: appState.menuBarSymbol)
         }
         .menuBarExtraStyle(.window)
         .onChange(of: menuBarInserted) {
@@ -31,6 +33,15 @@ struct CrossDeskApp: App {
                 menuBarInserted = true
             }
         }
+
+        // Desk editor (layout-ux R36). LSUIElement stays: the window only
+        // exists while the user keeps it open.
+        Window("Telas", id: "desk") {
+            DeskWindowView()
+                .environmentObject(appState)
+        }
+        .windowResizability(.contentSize)
+        .defaultSize(width: 600, height: 460)
     }
 
     private static func healStatusItemVisibility() {

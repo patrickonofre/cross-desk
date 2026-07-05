@@ -26,6 +26,9 @@ public struct AppConfig: Codable, Equatable, Sendable {
     /// Hide the arrow on the unfocused machine (R17). Off → cursor stays visible
     /// but parked (R18). Default on.
     public var concealCursor: Bool
+    /// First cursor handoff already happened on this machine — gates the
+    /// one-time "push the cursor through the edge" hint (layout-ux R39).
+    public var firstCrossingDone: Bool
 
     public init(
         role: Role = .server,
@@ -36,7 +39,8 @@ public struct AppConfig: Codable, Equatable, Sendable {
         pairedSecret: String = "",
         pairedServerName: String = "",
         deviceName: String = Host.current().localizedName ?? "Mac",
-        concealCursor: Bool = true
+        concealCursor: Bool = true,
+        firstCrossingDone: Bool = false
     ) {
         self.role = role
         self.edgeSide = edgeSide
@@ -47,6 +51,7 @@ public struct AppConfig: Codable, Equatable, Sendable {
         self.pairedServerName = pairedServerName
         self.deviceName = deviceName
         self.concealCursor = concealCursor
+        self.firstCrossingDone = firstCrossingDone
     }
 
     // Tolerant decode: a config written by an older build is missing newer keys
@@ -65,6 +70,7 @@ public struct AppConfig: Codable, Equatable, Sendable {
         pairedServerName = try c.decodeIfPresent(String.self, forKey: .pairedServerName) ?? d.pairedServerName
         deviceName = try c.decodeIfPresent(String.self, forKey: .deviceName) ?? d.deviceName
         concealCursor = try c.decodeIfPresent(Bool.self, forKey: .concealCursor) ?? d.concealCursor
+        firstCrossingDone = try c.decodeIfPresent(Bool.self, forKey: .firstCrossingDone) ?? d.firstCrossingDone
     }
 }
 
