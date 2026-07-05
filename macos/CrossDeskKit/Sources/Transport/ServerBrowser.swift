@@ -28,6 +28,9 @@ public struct DiscoveredServer: Equatable, Sendable, Identifiable {
 public final class ServerBrowser: @unchecked Sendable {
     private let queue = DispatchQueue(label: "crossdesk.transport.browser")
     private var browser: NWBrowser?
+    /// Bumped on stop() — a restart scheduled before the stop must not revive
+    /// the browser afterwards.
+    private var generation = 0
 
     /// Full list, sorted by name, on the browser queue.
     public var onUpdate: (@Sendable ([DiscoveredServer]) -> Void)?
@@ -73,6 +76,7 @@ public final class ServerBrowser: @unchecked Sendable {
 
     public func stop() {
         queue.async { [self] in
+            generation += 1
             browser?.stateUpdateHandler = nil
             browser?.cancel()
             browser = nil
@@ -95,8 +99,9 @@ public final class ServerBrowser: @unchecked Sendable {
         browser?.stateUpdateHandler = nil
         browser?.cancel()
         browser = nil
+        let scheduled = generation
         queue.asyncAfter(deadline: .now() + 1) { [weak self] in
-            guard let self else { return }
+            guard let self, scheduled == self.generation else { return } // stop() won the race
             // start() hops back onto the queue; the nil browser lets it run.
             self.start()
         }

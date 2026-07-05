@@ -83,7 +83,7 @@ extension Message {
         var payload = Data()
         switch self {
         case let .hello(protoVersion, name):
-            let nameBytes = Data(name.utf8.prefix(255))
+            let nameBytes = WireStrings.utf8Prefix(name, maxBytes: 255)
             payload.appendLE(protoVersion)
             payload.append(UInt8(nameBytes.count))
             payload.append(nameBytes)
@@ -238,7 +238,32 @@ extension Message {
     }
 }
 
-// MARK: - Little-endian helpers
+// MARK: - Wire string helpers
+
+/// Shared by Message (§2 framing) and FileChannelMessage (§8 framing): both
+/// truncate user-controlled strings (device name, error text) to a wire length
+/// limit before sending.
+enum WireStrings {
+    /// UTF-8 bytes of `string`, cut to at most `maxBytes` — backing off byte by
+    /// byte from a raw `prefix` until the result is valid UTF-8 again. A plain
+    /// `utf8.prefix(maxBytes)` can split a multi-byte scalar in half, and the
+    /// receiver's `String(data:encoding:.utf8)` returns nil on the fragment —
+    /// which throws all the way out of `decodeAll`, silently dropping the
+    /// whole datagram (not just the oversized field).
+    static func utf8Prefix(_ string: String, maxBytes: Int) -> Data {
+        let full = Data(string.utf8)
+        guard full.count > maxBytes else { return full }
+        var end = maxBytes
+        while end > 0 {
+            let candidate = full.prefix(end)
+            if String(data: candidate, encoding: .utf8) != nil {
+                return candidate
+            }
+            end -= 1
+        }
+        return Data()
+    }
+}
 
 /// Shared by Message (§2 framing) and FileChannelMessage (§8 framing).
 struct Reader {

@@ -82,10 +82,12 @@ public final class DTLSClient: @unchecked Sendable {
     /// The file channel (PROTOCOL.md §8) dials this same host over TCP — the
     /// Bonjour `.service` endpoint resolves here to a concrete host.
     public func remoteHost() -> String? {
-        guard case let .hostPort(host, _)? = connection?.currentPath?.remoteEndpoint else {
-            return nil
+        queue.sync {
+            guard case let .hostPort(host, _)? = connection?.currentPath?.remoteEndpoint else {
+                return nil
+            }
+            return "\(host)"
         }
-        return "\(host)"
     }
 
     // MARK: - Internals (on queue)

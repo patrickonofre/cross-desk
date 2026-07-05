@@ -27,6 +27,18 @@
 
 - **2026-07-04 — discovery-pairing especificada** (viabilidade confirmada): descoberta Bonjour nativa (`NWListener.Service` + `NWBrowser`, `_crossdesk._udp`, zero deps) + pareamento por token curto (8 chars, ~40 bits) com rotação para segredo 128-bit via PAIR_SET/PAIR_ACK (0x05/0x06) dentro do túnel DTLS. Decisões do usuário: token curto+rotação, reconexão automática, fallback manual por IP mantido. Risco aceito: brute-force offline do token na janela de pareamento (documentar no PROTOCOL.md; PAKE elimina na Fase 4). Docs: `.specs/features/discovery-pairing/` (spec/context/design/tasks T29–T38).
 
+## Decisões (cont. 3)
+
+- **2026-07-05 — code review profundo de todo o CrossDeskKit/App** (168 arquivos-fonte, ~6.4k linhas — cobertura completa, não amostragem): 8 bugs reais corrigidos, todos com teste ou build de verificação; suite subiu de 166 → 168 testes verdes; release build (`make-app.sh`) limpo, zero warnings. Nenhuma lacuna de escopo pendente identificada nesta passada — próxima revisão profunda só faz sentido após a próxima leva de features (Fase 2/3) ou se surgir um bug em campo. Achados:
+  - `DTLSClient.remoteHost()` lia `connection` fora da `queue` de confinamento (data race) — agora `queue.sync`.
+  - `ServerBrowser.restart()` podia reviver o browser depois de um `stop()` (retry de 1s agendado antes do stop, sem guarda) — contador de geração incrementado no `stop()`.
+  - `TransferCoordinator.updateFilePSK` reconstruía o listener sem retry — mesma classe de falha (bind race, EADDRINUSE) já resolvida no `DTLSServer`, mas o file-channel ficava mudo até reiniciar a app. Retry com backoff + guarda `stopped`/rotação superada.
+  - `TransferCoordinator.receiveNow()` não checava `active == nil` — clicar "Receber agora" durante outra transferência descartava a oferta pendente silenciosamente.
+  - `AppState.connect(to:)` gravava `config.pairedServerName` ANTES do PAIR_SET confirmar — se o usuário digitasse o token errado ou a troca falhasse, o secret antigo ficava associado ao nome errado. Agora `pendingServerName` só vira `pairedServerName` no callback `onPairSet`.
+  - `Message.hello` e `FileChannelMessage.error`: truncagem de nome/mensagem por contagem de bytes (`utf8.prefix(N)`) podia cortar um caractere multi-byte ao meio (acento comum em nome de Mac). O lado receptor falha `String(data:encoding:.utf8)` e o `decodeAll` derruba o datagrama INTEIRO, não só o campo — silencioso. Fix: `WireStrings.utf8Prefix` (Sources/Protocol/Message.swift) recua byte a byte até achar um limite de escalar válido. Testes de regressão com "á" repetido no boundary exato (`MessageTests.testHelloNameTruncationNeverSplitsAMultiByteCharacter`, `FileChannelMessageTests.testErrorMessageTruncationNeverSplitsAMultiByteCharacter`).
+  - `NetworkInfo.localIPv4Addresses()`: `String(cString:)` sobre `[CChar]` é a via deprecated (warning no build release) — trocado para a variante de ponteiro (`withUnsafeBufferPointer`).
+  - `FileReceiver.handle`: `var item` sem mutação (warning) → `let`.
+
 ## Pendências
 
 - [ ] **layout-ux — CODE-COMPLETE (T49–T56 ✅), falta UAT T57** (2026-07-05): DeskModel (projeção/snap/fases, unit) + janela "Telas" (canvas real + tile do peer arrastável) + mini-mapa no painel + ícone dinâmico + coach-mark R39 + a11y inline. 166 testes verdes (+15), app assina. UAT T57 em 2 macs (aceitações R35–R41 + Accessibility Inspector) — **juntar com a sessão consolidada de 2026-07-06** (T28/T38/T47). Veto pendente do usuário no UAT: símbolo `cursorarrow.motionlines` p/ REMOTE.
@@ -53,6 +65,8 @@
 - `NWConnection` presa em `.preparing` (porta morta) nunca vira `.failed` sozinha — timeout de handshake é obrigatório em UDP/DTLS (vale igual p/ TCP/TLS: `FileChannelConnection` reusa o mesmo timeout).
 - Enfileirar `send()` público (queue.async) de dentro de um bloco já na queue = mensagem sai depois do teardown. Métodos internos *OnQueue diretos.
 - **Confirmado na prática (beta.1→beta.2):** update de app ad-hoc quebra TCC nas duas máquinas — toggle aparece ligado em System Settings mas o preflight falha, e re-conceder NÃO regrava a entrada. Cura: `tccutil reset All dev.crossdesk.mac` + conceder de novo. Prevenção: identidade de assinatura estável.
+- Truncar `String.utf8` por contagem de bytes (`.prefix(N)`) pode cortar um escalar multi-byte ao meio — o outro lado falha `String(data:encoding:.utf8)` no fragmento e o parser (que confia em "UTF-8 inválido = payload corrompido") derruba a mensagem INTEIRA, não só o campo truncado. Qualquer campo de string com limite de tamanho no fio precisa recuar até um limite de escalar válido, não só cortar bytes (`WireStrings.utf8Prefix`, 2026-07-05).
+- Padrão "listener/browser que se recria sozinho após falha" (retry, bind race, rotação de PSK) precisa de um contador de geração comparado no callback assíncrono — sem isso, um `stop()` chamado entre o agendamento do retry e sua execução deixa o componente reviver depois de "parado". Já resolvido no `DTLSServer` desde o início; replicado em `ServerBrowser` e `TransferCoordinator` nesta revisão (2026-07-05) — vale como checklist para qualquer novo listener nas fases 2/3.
 
 ## Lições
 

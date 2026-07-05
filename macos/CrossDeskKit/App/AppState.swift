@@ -28,6 +28,11 @@ final class AppState: ObservableObject {
     private var clientSession: ClientSession?
     private var transferCoordinator: TransferCoordinator?
     private var pasteboardWatcher: PasteboardWatcher?
+    /// Server the user is pairing with right now. Only committed to
+    /// `config.pairedServerName` when PAIR_SET confirms — writing it upfront
+    /// would orphan the stored secret if the user taps the wrong server (the
+    /// secret stays but no row would ever lead with it again).
+    private var pendingServerName: String?
 
     init() {
         var loaded = (try? store.load()) ?? AppConfig()
@@ -81,6 +86,7 @@ final class AppState: ObservableObject {
         if running { stop() }
         config.pairedSecret = ""
         config.pairedServerName = ""
+        pendingServerName = nil
         switch config.role {
         case .server: config.pairingCode = PairingKey.generateShortToken()
         case .client: config.pairingCode = ""
@@ -174,17 +180,20 @@ final class AppState: ObservableObject {
         // The stored secret belongs to ONE server — never lead with it against
         // a different one (the token typed for the new server is the credential).
         let secret = server.name == config.pairedServerName ? config.pairedSecret : ""
-        config.pairedServerName = server.name
+        pendingServerName = server.name
         startClient(endpoint: server.endpoint, secret: secret, token: config.pairingCode)
     }
 
-    /// Manual fallback for networks without mDNS (R32).
+    /// Manual fallback for networks without mDNS (R32). Not a discovery row, so
+    /// there is no Bonjour name to (re)commit on PAIR_SET — leaves whatever
+    /// `pairedServerName` discovery last wrote untouched.
     func connectManual(host: String, token: String) {
         config.serverHost = host
         if !token.isEmpty {
             config.pairingCode = token
         }
         guard let port = NWEndpoint.Port(rawValue: config.port) else { return }
+        pendingServerName = nil
         startClient(
             endpoint: .hostPort(host: NWEndpoint.Host(host), port: port),
             secret: config.pairedSecret,
@@ -229,6 +238,12 @@ final class AppState: ObservableObject {
             Task { @MainActor in
                 guard let self else { return }
                 self.config.pairedSecret = secret
+                // Only now — pairing actually succeeded against THIS server —
+                // does the discovery row become the remembered one.
+                if let pendingServerName = self.pendingServerName {
+                    self.config.pairedServerName = pendingServerName
+                    self.pendingServerName = nil
+                }
                 self.saveConfig()
                 // The file channel follows the rotation (PROTOCOL.md §6/§8).
                 self.transferCoordinator?.updateFilePSK(PairingKey.filePSK(fromCode: secret))

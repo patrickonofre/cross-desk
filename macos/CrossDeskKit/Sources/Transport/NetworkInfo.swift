@@ -33,7 +33,7 @@ public enum NetworkInfo {
                 nil, 0, NI_NUMERICHOST
             ) == 0 else { continue }
 
-            let ip = String(cString: host)
+            let ip = host.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
             guard !ip.hasPrefix("169.254.") else { continue }
             result.append((interface: String(cString: ifa.ifa_name), ip: ip))
         }

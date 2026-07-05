@@ -83,7 +83,7 @@ public final class FileReceiver {
 
         case let .itemDone(sha256):
             switch current {
-            case .file(var item):
+            case .file(let item):
                 current = nil
                 try? item.handle.close()
                 guard item.written == item.expectedSize else {

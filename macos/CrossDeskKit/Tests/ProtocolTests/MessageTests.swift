@@ -174,6 +174,21 @@ final class MessageTests: XCTestCase {
         XCTAssertEqual(name.count, 255)
     }
 
+    /// "á" is 2 UTF-8 bytes; 150 of them (300 bytes) makes a raw `prefix(255)`
+    /// land mid-scalar (byte 255 is the lone lead byte of char #127) — the
+    /// receiver's `String(data:encoding:.utf8)` would then return nil, making
+    /// the whole HELLO (and the datagram carrying it) fail to decode instead of
+    /// just the name being shorter than requested.
+    func testHelloNameTruncationNeverSplitsAMultiByteCharacter() throws {
+        let longName = String(repeating: "á", count: 150)
+        let encoded = Message.hello(protoVersion: 1, name: longName).encoded()
+        let decoded = try Message.decodeAll(encoded)
+        guard case let .hello(_, name) = decoded[0] else {
+            return XCTFail("expected hello")
+        }
+        XCTAssertEqual(name, String(repeating: "á", count: 127))
+    }
+
     func testEmptyDatagramDecodesToNothing() throws {
         XCTAssertEqual(try Message.decodeAll(Data()), [])
     }

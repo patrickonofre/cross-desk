@@ -150,6 +150,21 @@ final class FileChannelMessageTests: XCTestCase {
         }
     }
 
+    /// Same class of bug as Message.hello's name truncation: a raw byte
+    /// `prefix(UInt16.max)` over a multi-byte string can split the last
+    /// scalar, making the whole ERROR frame fail `String(data:encoding:.utf8)`
+    /// on decode.
+    func testErrorMessageTruncationNeverSplitsAMultiByteCharacter() throws {
+        let longMessage = String(repeating: "á", count: Int(UInt16.max))
+        let encoded = FileChannelMessage.error(code: 1, message: longMessage).encoded()
+        var decoder = FileChannelDecoder()
+        let decoded = try decoder.feed(encoded)
+        guard case let .error(_, message) = decoded.first else {
+            return XCTFail("expected error")
+        }
+        XCTAssertEqual(message, String(repeating: "á", count: Int(UInt16.max) / 2))
+    }
+
     func testFileHelloUnknownModeThrows() {
         var decoder = FileChannelDecoder()
         // mode byte 0x07 — only 0 (push) and 1 (request) exist.

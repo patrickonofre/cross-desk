@@ -30,6 +30,7 @@ Cada datagrama DTLS carrega **uma ou mais mensagens** concatenadas:
 - Byte order: **little-endian** em todos os campos multi-byte.
 - `length` = tamanho do payload (não inclui o cabeçalho de 3 bytes).
 - Mensagem com `type` desconhecido: ignorar e pular `length` bytes (forward-compat).
+- Campos `utf8` com prefixo de tamanho (ex.: HELLO `name`, ERROR `msg`, §8) são texto arbitrário do usuário/SO — podem exceder o limite do prefixo. A implementação DEVE truncar recuando até um limite de escalar Unicode válido, nunca cortar bytes crus na contagem: um corte no meio de um caractere multi-byte produz UTF-8 inválido, e o lado receptor (que trata payload não-UTF-8 como mensagem corrompida) descarta a mensagem INTEIRA — não só o campo — silenciosamente. (Achado em code review, implementação de referência: `WireStrings.utf8Prefix`.)
 
 ## 3. Mensagens
 
@@ -139,3 +140,4 @@ Regras:
 - v0.1 (2026-07-03): nova mensagem SCROLL_CONTINUOUS (0x23, S→C) para scroll de trackpad de alta fidelidade (pixels + fases). `proto_version` inalterado (=1): mensagem de tipo novo é ignorável por decoders antigos (§2), então é adição compatível. Golden vectors acrescidos.
 - v0.1 (2026-07-04): pareamento por token curto + rotação — §1 reescrito (token 8 chars → segredo 128-bit via túnel), novas mensagens PAIR_SET (0x05, S→C) e PAIR_ACK (0x06, C→S), novo §6 (regras da rotação) e §7 (descoberta Bonjour `_crossdesk._udp`). `proto_version` inalterado (=1): tipos novos ignoráveis; cliente antigo fica em modo token (compatível). Golden vectors `pair_set`/`pair_ack` acrescidos.
 - v0.1 (2026-07-05): canal de arquivos — novas mensagens CLIP_FILES (0x50, ambas) e FILE_PULL (0x51, S→C) na tabela §3, novo **§8 Canal de arquivos** (TCP + TLS-PSK com `info="tls-psk-file"`, framing length u32, mensagens 0x01–0x07 próprias), Versionamento renumerado §8→§9. `proto_version` inalterado (=1): tipos DTLS novos são ignoráveis (§2) — build antigo simplesmente não transfere arquivos; o canal TCP negocia versão própria no FILE_HELLO. Golden vectors `clip_files`/`file_pull`/`fc_*` acrescidos.
+- v0.1 (2026-07-05): esclarecimento normativo em §2 sobre truncagem de campos `utf8` — não muda o formato do fio nem os golden vectors (nenhum vetor existente passa do limite do prefixo), só a obrigação de como uma implementação corta texto longo demais. Motivado por bug real na implementação de referência (truncagem por contagem de bytes cortando um escalar Unicode ao meio, corrigido nesta data).

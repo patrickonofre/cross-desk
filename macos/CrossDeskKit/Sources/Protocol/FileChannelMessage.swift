@@ -114,7 +114,7 @@ extension FileChannelMessage {
             payload.append(origin.rawValue)
             return (.cancel, payload)
         case let .error(code, message):
-            let messageBytes = Data(message.utf8.prefix(Int(UInt16.max)))
+            let messageBytes = WireStrings.utf8Prefix(message, maxBytes: Int(UInt16.max))
             payload.append(code)
             payload.appendLE(UInt16(messageBytes.count))
             payload.append(messageBytes)

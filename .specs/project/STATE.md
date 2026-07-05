@@ -8,6 +8,7 @@
 - **2026-07-03 — Geometria independente por máquina** (protocolo §5): resolução/layout nunca trafegam; cliente detecta a própria borda de retorno (LEAVE_REQUEST 0x12). Vale para todas as implementações (Windows/Linux herdam o contrato).
 
 - **2026-07-04 — file-transfer antecipada** (decisão do usuário; era "ideia adiada"/não-objetivo v1). Staged: E1 clipboard de arquivos (⌘C/⌘V, API pública), E2 drag real só se spike S1 provar (Synergy falhou nisso; Deskflow removeu). Destino fallback: `~/Downloads/CrossDesk/`. Specs: `macos/.specs/features/file-transfer/`.
+- **2026-07-05 — PROTOCOL.md §2 ganhou regra normativa de truncagem de campos `utf8`** (achado em code review profundo da app mac): cortar string longa por contagem de bytes crus pode partir um escalar Unicode ao meio, e o receptor descarta a mensagem inteira como corrompida. Vale para toda implementação (Windows/Linux herdam a regra) — ver Changelog do protocolo e `macos/.specs/project/STATE.md` (lições) para o detalhe técnico e o fix de referência (`WireStrings.utf8Prefix`).
 
 ## Bloqueios
 

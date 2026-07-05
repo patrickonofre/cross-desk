@@ -18,7 +18,7 @@ Apps nativas independentes por sistema operacional ([ADR-002](.specs/project/TEC
 Requisitos: macOS 14+, Xcode 16+.
 
 ```bash
-# testes (51, headless)
+# testes (168, headless)
 cd macos/CrossDeskKit && swift test
 
 # build da app

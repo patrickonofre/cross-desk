@@ -57,6 +57,9 @@ public final class TransferCoordinator: @unchecked Sendable {
     public var onUIState: (@Sendable (TransferUIState) -> Void)?
 
     private var listener: FileChannelListener?
+    /// stop() flips this so a pending listener-rebuild retry can't revive the
+    /// coordinator afterwards.
+    private var stopped = false
     /// Our latest local announce; a new copy replaces it (§3: new announce
     /// invalidates the previous one).
     private var outgoing: (id: UInt32, roots: [URL], items: Int, bytes: UInt64)?
@@ -108,18 +111,27 @@ public final class TransferCoordinator: @unchecked Sendable {
     public func start() throws {
         FileReceiver.cleanStaging(root: policy.stagingRoot)
         if case .server = role {
-            let listener = FileChannelListener(port: port, psk: filePSK)
-            listener.onConnection = { [weak self] connection in
-                guard let self else { return }
-                self.queue.async { self.adopt(connection) }
-            }
+            let listener = makeListener(psk: filePSK)
             try listener.start()
             self.listener = listener
         }
     }
 
+    private func makeListener(psk: Data) -> FileChannelListener {
+        let listener = FileChannelListener(port: port, psk: psk)
+        listener.onConnection = { [weak self] connection in
+            guard let self else { return }
+            self.queue.async { self.adopt(connection) }
+        }
+        listener.onFailed = { reason in
+            Log.session.error("filetransfer: listener failed — \(reason, privacy: .public)")
+        }
+        return listener
+    }
+
     public func stop() {
         queue.async { [self] in
+            stopped = true
             listener?.stop()
             listener = nil
             for (_, connection) in unrouted { connection.close() }
@@ -133,19 +145,32 @@ public final class TransferCoordinator: @unchecked Sendable {
     }
 
     /// Pairing rotated (PROTOCOL.md §6): the file channel must follow the new
-    /// secret — the server listener is rebuilt with the new PSK.
+    /// secret — the server listener is rebuilt with the new PSK. The rebuild
+    /// can lose the bind race against the just-cancelled socket (same failure
+    /// class as the DTLS listener rotation) — retry briefly instead of leaving
+    /// the file channel silently dead until the next restart.
     public func updateFilePSK(_ psk: Data) {
         queue.async { [self] in
             filePSK = psk
             guard case .server = role, listener != nil else { return }
             listener?.stop()
-            let rebuilt = FileChannelListener(port: port, psk: psk)
-            rebuilt.onConnection = { [weak self] connection in
-                guard let self else { return }
-                self.queue.async { self.adopt(connection) }
-            }
-            try? rebuilt.start()
+            rebuildListener(psk: psk, retriesLeft: 5)
+        }
+    }
+
+    private func rebuildListener(psk: Data, retriesLeft: Int) {
+        guard !stopped else { return }
+        guard psk == filePSK else { return } // a newer rotation superseded this one
+        let rebuilt = makeListener(psk: psk)
+        do {
+            try rebuilt.start()
             listener = rebuilt
+        } catch {
+            Log.session.error("filetransfer: listener rebuild threw \(String(describing: error), privacy: .public) (retries left \(retriesLeft, privacy: .public))")
+            guard retriesLeft > 0 else { return }
+            queue.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                self?.rebuildListener(psk: psk, retriesLeft: retriesLeft - 1)
+            }
         }
     }
 
@@ -189,9 +214,11 @@ public final class TransferCoordinator: @unchecked Sendable {
     }
 
     /// "Receber agora" for a pending (>limit) offer — lands in Downloads (R6).
+    /// While another transfer is active the offer stays claimable (consuming
+    /// it here would silently drop it — `materialize` refuses when busy).
     public func receiveNow() {
         queue.async { [self] in
-            guard let offer = pendingOffer else { return }
+            guard let offer = pendingOffer, active == nil else { return }
             pendingOffer = nil
             materialize(id: offer.id, bytes: offer.bytes, toDownloads: true)
         }
