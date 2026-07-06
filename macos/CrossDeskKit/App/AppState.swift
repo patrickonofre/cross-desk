@@ -397,7 +397,16 @@ final class AppState: ObservableObject {
     /// R41: menubar icon mirrors where the input goes.
     var menuBarSymbol: String {
         if case .controllingRemote = sessionState { return "cursorarrow.motionlines" }
-        return running ? "display.2.fill" : "display.2"
+        return "display.2"
+    }
+
+    /// Whether `menuBarSymbol` should render filled. Applied via `.symbolVariant`
+    /// (not baked into the name) — a hardcoded "display.2.fill" faults at
+    /// runtime on symbol sets that don't ship that variant (SwiftUI logs it as
+    /// an Invalid Configuration fault, seen live during the 2026-07-06 UAT).
+    var menuBarSymbolFilled: Bool {
+        if case .controllingRemote = sessionState { return false }
+        return running
     }
 
     /// R39: the hint dies at the first real handoff, forever (persisted).

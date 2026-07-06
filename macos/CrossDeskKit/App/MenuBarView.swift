@@ -489,6 +489,7 @@ struct MenuBarView: View {
             Spacer()
 
             Button("Sair") {
+                Log.app.info("quit requested via Sair button")
                 NSApplication.shared.terminate(nil)
             }
         }
