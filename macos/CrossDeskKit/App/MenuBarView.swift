@@ -63,7 +63,7 @@ struct MenuBarView: View {
         .labelsHidden()
         .disabled(appState.running)
         .onChange(of: appState.config.role) {
-            if appState.config.role == .server && appState.config.pairingCode.isEmpty {
+            if appState.config.role == .server && !PairingKey.isShortToken(appState.config.pairingCode) {
                 appState.regeneratePairingToken()
             }
             appState.saveConfig()
@@ -265,7 +265,7 @@ struct MenuBarView: View {
 
         if pairingWith?.name == server.name {
             HStack(spacing: 6) {
-                TextField("Token do servidor (XXXX-XXXX)", text: $tokenInput)
+                TextField("Token do servidor (XXX-XXX)", text: $tokenInput)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(.body, design: .monospaced))
                     .onSubmit { pairAndConnect(server) }

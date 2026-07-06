@@ -9,6 +9,7 @@
 
 - **2026-07-04 — file-transfer antecipada** (decisão do usuário; era "ideia adiada"/não-objetivo v1). Staged: E1 clipboard de arquivos (⌘C/⌘V, API pública), E2 drag real só se spike S1 provar (Synergy falhou nisso; Deskflow removeu). Destino fallback: `~/Downloads/CrossDesk/`. Specs: `macos/.specs/features/file-transfer/`.
 - **2026-07-05 — PROTOCOL.md §2 ganhou regra normativa de truncagem de campos `utf8`** (achado em code review profundo da app mac): cortar string longa por contagem de bytes crus pode partir um escalar Unicode ao meio, e o receptor descarta a mensagem inteira como corrompida. Vale para toda implementação (Windows/Linux herdam a regra) — ver Changelog do protocolo e `macos/.specs/project/STATE.md` (lições) para o detalhe técnico e o fix de referência (`WireStrings.utf8Prefix`).
+- **2026-07-06 — token curto de pareamento reduzido de 8 para 6 chars** (decisão do usuário; PROTOCOL.md §1, `XXXX-XXXX` → `XXX-XXX`, ≈39 → ≈29 bits). Troca deliberada de UX (menos dígitos pra ler/digitar) por menos entropia; aceitável porque o token nunca trafega no fio (deriva PSK localmente nos dois lados) e é substituído pelo segredo rotacionado de 128 bits logo no 1º handshake (R29) — a única janela de exposição é o handshake de pareamento em si, já documentada. Sem mudança de formato de fio nem golden vectors. Vale para toda implementação (Windows/Linux herdam a regra).
 
 ## Bloqueios
 

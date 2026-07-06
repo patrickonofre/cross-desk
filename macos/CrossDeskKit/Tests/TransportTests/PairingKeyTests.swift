@@ -38,12 +38,28 @@ final class PairingKeyTests: XCTestCase {
 
     func testShortTokenFormat() {
         let token = PairingKey.generateShortToken()
-        XCTAssertEqual(token.count, 9)
+        XCTAssertEqual(token.count, 7)
         let groups = token.split(separator: "-")
         XCTAssertEqual(groups.count, 2)
-        XCTAssertTrue(groups.allSatisfy { $0.count == 4 })
+        XCTAssertTrue(groups.allSatisfy { $0.count == 3 })
         let alphabet = Set(PairingKey.tokenAlphabet)
         XCTAssertTrue(token.replacingOccurrences(of: "-", with: "").allSatisfy(alphabet.contains))
+    }
+
+    func testIsShortTokenAcceptsGeneratedTokensInAnyCaseOrSpacing() {
+        let token = PairingKey.generateShortToken()
+        XCTAssertTrue(PairingKey.isShortToken(token))
+        XCTAssertTrue(PairingKey.isShortToken(token.lowercased()))
+        XCTAssertTrue(PairingKey.isShortToken(token.replacingOccurrences(of: "-", with: "")))
+    }
+
+    func testIsShortTokenRejectsStaleLongFormCode() {
+        // The old 32-hex manual code (pre-short-token flow) is never empty,
+        // so a config left over from back then must be caught here or it
+        // survives forever instead of being regenerated (R28 migration bug).
+        XCTAssertFalse(PairingKey.isShortToken("773f920d090ab979d7fc970454ba1342"))
+        XCTAssertFalse(PairingKey.isShortToken(""))
+        XCTAssertFalse(PairingKey.isShortToken("ABC-DEFG"))
     }
 
     func testShortTokenAlphabetHasNoAmbiguousCharacters() {
@@ -52,7 +68,7 @@ final class PairingKeyTests: XCTestCase {
     }
 
     func testShortTokensAreUnique() {
-        // 100 draws from a 39-bit space colliding would point at broken RNG
+        // 100 draws from a 29-bit space colliding would point at broken RNG
         // plumbing, not bad luck.
         let tokens = (0..<100).map { _ in PairingKey.generateShortToken() }
         XCTAssertEqual(Set(tokens).count, tokens.count)

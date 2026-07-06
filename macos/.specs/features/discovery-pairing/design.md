@@ -50,7 +50,7 @@ Browse ativo somente com: papel = cliente E sessão parada E painel aberto ao me
 
 ### Token (R28) — `PairingKey` estendido
 
-- `generateShortToken() -> String` — 8 chars do alfabeto Crockford-like sem ambíguos (`23456789ABCDEFGHJKMNPQRSTVWXYZ`), via `SecRandomCopyBytes`, retornado como `XXXX-XXXX`.
+- `generateShortToken() -> String` — 6 chars do alfabeto Crockford-like sem ambíguos (`23456789ABCDEFGHJKMNPQRSTVWXYZ`), via `SecRandomCopyBytes`, retornado como `XXX-XXX`.
 - `normalize(_:)` (público, extraído do atual inline): remove tudo que não é alfanumérico + lowercase. `psk(fromCode:)` passa a usá-lo — `abcd-efgh` ≡ `ABCDEFGH`. Código longo existente continua funcionando pela mesma rota (compat).
 - Fingerprint continua disponível (debug/log), mas sai do fluxo de UI principal — o match agora é o próprio token na tela.
 
@@ -128,11 +128,11 @@ Migração: config existente com `pairingCode` de 32 hex continua válida — se
 ## 5. UI (MenuBarView + AppState)
 
 **Servidor:**
-- Não-pareado: token `XXXX-XXXX` grande (title2 monospaced), "Aguardando pareamento…" quando rodando; botão regenerar (só parado ou não-pareado).
+- Não-pareado: token `XXX-XXX` grande (title2 monospaced), "Aguardando pareamento…" quando rodando; botão regenerar (só parado ou não-pareado).
 - Pareado: "Pareado ✓" + botão "Esquecer pareamento". Token some. Seção de endereços IP: rebaixada para dentro do disclosure manual (descoberta é o caminho principal).
 
 **Cliente:**
-- Lista de servidores descobertos (nome + ícone status). Servidor pareado destacado ("já pareado") → clique conecta direto. Não-pareado → clique expande campo token (`XXXX-XXXX`, autoformatação opcional) + botão "Parear e conectar".
+- Lista de servidores descobertos (nome + ícone status). Servidor pareado destacado ("já pareado") → clique conecta direto. Não-pareado → clique expande campo token (`XXX-XXX`, autoformatação opcional) + botão "Parear e conectar".
 - Vazio: "Procurando servidores…" + (se `permissionDenied`) dica Rede Local (R33).
 - `DisclosureGroup("Conectar por IP…")`: host + token — caminho manual completo (R32).
 - Esquecer pareamento disponível quando pareado.
@@ -154,7 +154,7 @@ Bump `CFBundleVersion`. App não-sandbox: sem entitlements novos; o prompt de Re
 
 ## 7. PROTOCOL.md (R34)
 
-- §1: nota de segurança reescrita — token curto (~40 bits) válido só na janela de pareamento; rotação obrigatória para segredo ≥128 bits via PAIR_SET/PAIR_ACK; brute-force offline do handshake de pareamento documentado como limitação até PAKE.
+- §1: nota de segurança reescrita — token curto (~29 bits) válido só na janela de pareamento; rotação obrigatória para segredo ≥128 bits via PAIR_SET/PAIR_ACK; brute-force offline do handshake de pareamento documentado como limitação até PAKE.
 - §3: linhas 0x05/0x06.
 - **§7 Discovery (novo):** tipo `_crossdesk._udp`, instância = nome do dispositivo, TXT `proto`, porta via SRV; anúncio obrigatório enquanto servidor ativo; cliente NÃO deve confiar em dados do TXT para segurança (só conveniência).
 - Changelog + golden vectors `pair_set`/`pair_ack` em `vectors/v0_1.txt`.

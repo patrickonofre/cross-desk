@@ -18,7 +18,7 @@ Cliente encontra o servidor sozinho (zero IP/porta digitados) e o pareamento exi
 
 ### Grupo B — Pareamento por token curto + rotação
 
-- **R28 — Token curto de pareamento.** Servidor não-pareado exibe token de 8 caracteres (alfabeto sem ambíguos — sem 0/O/1/I/L —, ~40 bits), formatado `XXXX-XXXX`, em fonte grande/monoespaçada. Normalização antes da derivação (remove separadores/espaços, case-insensitive): digitar `abcd-efgh` ou `ABCDEFGH` dá no mesmo. PSK derivada pela mesma rota HKDF existente (`PairingKey.psk(fromCode:)`).
+- **R28 — Token curto de pareamento.** Servidor não-pareado exibe token de 6 caracteres (alfabeto sem ambíguos — sem 0/O/1/I/L —, ~29 bits), formatado `XXX-XXX`, em fonte grande/monoespaçada. Normalização antes da derivação (remove separadores/espaços, case-insensitive): digitar `abc-def` ou `ABCDEF` dá no mesmo. PSK derivada pela mesma rota HKDF existente (`PairingKey.psk(fromCode:)`).
 - **R29 — Rotação para segredo forte após o 1º handshake.** Sessão estabelecida com PSK do token → servidor gera segredo de 128 bits (hex), envia `PAIR_SET` (0x05) dentro do túnel DTLS e repete até receber `PAIR_ACK` (0x06) — retry idempotente (mesmo segredo), pois roda sobre UDP. Cliente persiste o segredo ao receber e responde ACK. Servidor persiste ao receber o ACK e passa a aceitar novos handshakes só com o segredo. Reconexões futuras não pedem token (R30).
 - **R30 — Reconexão automática com fallback.** Cliente pareado conecta direto com o segredo. Se o handshake com o segredo falhar por timeout E um token tiver sido digitado nesta sessão de pareamento, tenta o token (cobre "servidor esqueceu o pareamento"). Se nada funcionar, UI pede token novo. Servidor não-pareado (pós-esquecer) exibe token novo.
 - **R31 — Esquecer pareamento nos dois lados.** Servidor: apaga segredo, regenera token, volta a "aguardando pareamento". Cliente: apaga segredo/token, volta à lista de servidores.
@@ -31,8 +31,8 @@ Cliente encontra o servidor sozinho (zero IP/porta digitados) e o pareamento exi
 
 ## Segurança (análise explícita)
 
-- **Brute-force online do token:** inviável na prática — servidor aceita 1 conexão por vez (slot único + handshake timeout serializa tentativas) e 40 bits ≫ qualquer taxa alcançável assim.
-- **Brute-force offline (sniffer na LAN captura o handshake de pareamento):** 40 bits são quebráveis offline. Janela de exposição = somente o(s) handshake(s) da fase de pareamento (segundos, uma vez na vida do par); o segredo rotacionado de 128 bits nunca é derivável do token. Aceito e documentado no PROTOCOL.md §1; eliminação definitiva = PAKE (SPAKE2), já previsto como upgrade futuro.
+- **Brute-force online do token:** inviável na prática — servidor aceita 1 conexão por vez (slot único + handshake timeout serializa tentativas) e 29 bits ≫ qualquer taxa alcançável assim.
+- **Brute-force offline (sniffer na LAN captura o handshake de pareamento):** 29 bits são quebráveis offline. Janela de exposição = somente o(s) handshake(s) da fase de pareamento (segundos, uma vez na vida do par); o segredo rotacionado de 128 bits nunca é derivável do token. Aceito e documentado no PROTOCOL.md §1; eliminação definitiva = PAKE (SPAKE2), já previsto como upgrade futuro.
 - **Segredo em JSON plano:** herda a pendência existente (migração Keychain pós-MVP, já rastreada no STATE.md).
 
 ## Fora de escopo

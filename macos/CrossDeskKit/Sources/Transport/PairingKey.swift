@@ -5,7 +5,7 @@ import Security
 /// Pairing-code based PSK derivation (PROTOCOL.md §1).
 ///
 /// Two kinds of code flow through the same HKDF path:
-/// - the short pairing token (8 chars, shown on the server, typed once on the
+/// - the short pairing token (6 chars, shown on the server, typed once on the
 ///   client — valid only for the pairing window, R28), and
 /// - the long-term secret (32 hex chars, delivered via PAIR_SET inside the
 ///   DTLS tunnel after the first successful handshake, R29).
@@ -32,7 +32,7 @@ public enum PairingKey {
     /// character survives being read aloud or retyped from a screen.
     static let tokenAlphabet = Array("23456789ABCDEFGHJKMNPQRSTVWXYZ")
 
-    /// Short pairing token, "XXXX-XXXX" (8 chars ≈ 39 bits). Only valid during
+    /// Short pairing token, "XXX-XXX" (6 chars ≈ 29 bits). Only valid during
     /// the pairing window: the first successful handshake rotates to a 128-bit
     /// secret (R29), so this never becomes the long-term key.
     public static func generateShortToken() -> String {
@@ -40,14 +40,25 @@ public enum PairingKey {
         // characters (256 % 30 ≠ 0), and this string is security material.
         let limit = UInt8(256 - 256 % tokenAlphabet.count) // 240
         var chars: [Character] = []
-        while chars.count < 8 {
+        while chars.count < 6 {
             var byte: UInt8 = 0
             let status = SecRandomCopyBytes(kSecRandomDefault, 1, &byte)
             precondition(status == errSecSuccess, "SecRandomCopyBytes failed: \(status)")
             guard byte < limit else { continue }
             chars.append(tokenAlphabet[Int(byte) % tokenAlphabet.count])
         }
-        return String(chars[0..<4]) + "-" + String(chars[4..<8])
+        return String(chars[0..<3]) + "-" + String(chars[3..<6])
+    }
+
+    /// Whether `code` could have come from `generateShortToken()` — used to
+    /// detect a stale value left in a persisted config (e.g. the old 32-hex
+    /// manual code from before this token existed, which is never empty and
+    /// so would otherwise survive forever instead of being regenerated).
+    public static func isShortToken(_ code: String) -> Bool {
+        let stripped = code.uppercased().filter { $0 != "-" && !$0.isWhitespace }
+        guard stripped.count == 6 else { return false }
+        let alphabet = Set(tokenAlphabet)
+        return stripped.allSatisfy(alphabet.contains)
     }
 
     /// Short non-reversible identifier of a PSK, safe to log. Both machines

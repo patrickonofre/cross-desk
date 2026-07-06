@@ -36,8 +36,12 @@ final class AppState: ObservableObject {
 
     init() {
         var loaded = (try? store.load()) ?? AppConfig()
-        // First run as server: a pairing token must exist before the UI shows it.
-        if loaded.pairingCode.isEmpty && loaded.role == .server {
+        // First run as server: a valid pairing token must exist before the UI
+        // shows it (catches empty AND stale/wrong-format values — e.g. a
+        // config saved before this token existed, or before its length last
+        // changed — which would otherwise survive forever since they're
+        // never empty).
+        if loaded.role == .server && !PairingKey.isShortToken(loaded.pairingCode) {
             loaded.pairingCode = PairingKey.generateShortToken()
         }
         config = loaded
