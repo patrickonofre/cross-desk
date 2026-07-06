@@ -21,9 +21,14 @@ final class AppState: ObservableObject {
     @Published var clientReturnEdge: EdgeSide?
     /// Client only (layout-ux R38): the cursor is currently on this machine.
     @Published var clientFocused = false
+    /// A VPN/virtual interface is active on this machine right now (UI hint
+    /// only — the transport itself refuses to route over it regardless,
+    /// see `DTLSParameters.prohibitedInterfaceTypes`).
+    @Published var vpnActive = false
 
     private let store = ConfigStore()
     private let browser = ServerBrowser()
+    private let vpnMonitor = VPNMonitor()
     private var serverSession: ServerSession?
     private var clientSession: ClientSession?
     private var transferCoordinator: TransferCoordinator?
@@ -55,6 +60,11 @@ final class AppState: ObservableObject {
             Task { @MainActor in self?.localNetworkDenied = denied }
         }
         updateBrowsing()
+
+        vpnMonitor.onChange = { [weak self] active in
+            Task { @MainActor in self?.vpnActive = active }
+        }
+        vpnMonitor.start()
 
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
         Log.app.info("app launched (build \(build, privacy: .public)), role \(loaded.role.rawValue, privacy: .public)")

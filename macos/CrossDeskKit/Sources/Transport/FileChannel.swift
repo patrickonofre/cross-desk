@@ -23,7 +23,10 @@ enum FileChannelParameters {
         sec_protocol_options_set_min_tls_protocol_version(sec, .TLSv12)
         sec_protocol_options_set_max_tls_protocol_version(sec, .TLSv12)
 
-        return NWParameters(tls: tlsOptions, tcp: NWProtocolTCP.Options())
+        let parameters = NWParameters(tls: tlsOptions, tcp: NWProtocolTCP.Options())
+        // Same reasoning as DTLSParameters: LAN-only, never through a VPN tunnel.
+        parameters.prohibitedInterfaceTypes = [.other]
+        return parameters
     }
 }
 

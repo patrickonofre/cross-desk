@@ -13,6 +13,9 @@ struct MenuBarView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
+            if appState.vpnActive {
+                vpnWarning
+            }
             MiniMapView()
             Divider()
             rolePicker
@@ -51,6 +54,20 @@ struct MenuBarView: View {
                 .font(.callout.weight(.medium))
                 .lineLimit(2)
             Spacer()
+        }
+    }
+
+    // VPN pode brigar por interface com o tráfego local (achado ao vivo no
+    // UAT de 2026-07-06) — o transporte já recusa rotear pela VPN
+    // (`prohibitedInterfaceTypes`), isso aqui é só o aviso pro usuário.
+    private var vpnWarning: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text("VPN detectada — pode causar instabilidade na conexão local")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

@@ -23,7 +23,16 @@ enum DTLSParameters {
         sec_protocol_options_set_min_tls_protocol_version(sec, .DTLSv12)
         sec_protocol_options_set_max_tls_protocol_version(sec, .DTLSv12)
 
-        return NWParameters(dtls: tlsOptions, udp: NWProtocolUDP.Options())
+        let parameters = NWParameters(dtls: tlsOptions, udp: NWProtocolUDP.Options())
+        // This is a LAN-only relay — never route it through a VPN tunnel.
+        // `.other` is the only interface type Network.framework offers for
+        // virtual/unknown interfaces (utun included); a corporate VPN on
+        // either machine otherwise races Wi-Fi/Ethernet against the tunnel
+        // interface for the same connection, producing exactly the handshake
+        // timeouts / peer timeouts / edge-crossing flapping seen live in the
+        // 2026-07-06 UAT session.
+        parameters.prohibitedInterfaceTypes = [.other]
+        return parameters
     }
 }
 
