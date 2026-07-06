@@ -3,6 +3,7 @@ import CrossDeskKit
 
 @main
 struct CrossDeskApp: App {
+    @NSApplicationDelegateAdaptor(AppTerminationLogger.self) private var terminationLogger
     @StateObject private var appState = AppState()
     // The menu bar icon is this app's ONLY UI (LSUIElement — no Dock, no
     // windows). macOS lets the user drag status items off the bar (⌘-drag,
@@ -15,6 +16,20 @@ struct CrossDeskApp: App {
 
     init() {
         Self.healStatusItemVisibility()
+        // A windowless, backgrounded LSUIElement app is exactly what AppKit's
+        // Automatic Termination targets for a silent reap (confirmed live via
+        // `com.apple.AppKit:AutomaticTermination` in the unified log while
+        // testing debug-console below — no Sair, no ⌘Q, the OS just asked
+        // applicationShouldTerminate: and got the default NSTerminateNow).
+        // This app has no "done, nothing to do" state — it's a server/client
+        // relay — so it must never be an auto-termination candidate.
+        ProcessInfo.processInfo.disableAutomaticTermination("CrossDesk runs as a background menu bar relay")
+        // Hidden debug console (debug-console R43) — no menu entry, see
+        // DebugConsoleWindow.swift. Cmd+Shift+D, works regardless of role or
+        // TCC state (RegisterEventHotKey needs no permission).
+        DebugHotKey.register {
+            DebugConsoleWindowController.shared.toggle()
+        }
     }
 
     var body: some Scene {
@@ -25,6 +40,7 @@ struct CrossDeskApp: App {
             // R41: the icon tells where the input goes even with the panel
             // closed (cursor-with-motion-lines while controlling the peer).
             Image(systemName: appState.menuBarSymbol)
+                .symbolVariant(appState.menuBarSymbolFilled ? .fill : .none)
         }
         .menuBarExtraStyle(.window)
         .onChange(of: menuBarInserted) {
@@ -53,5 +69,16 @@ struct CrossDeskApp: App {
             defaults.set(true, forKey: key)
             Log.app.info("menubar: healed persisted removal (\(key, privacy: .public) was false)")
         }
+    }
+}
+
+/// Logs every app shutdown path (Sair, ⌘Q, Dock quit, System shutdown/logout,
+/// `relaunch()`) so a UAT report of "the app just closed" is diagnosable from
+/// `log show` alone instead of only from whichever call site remembered to
+/// log first. Debugging aid only — no cleanup logic belongs here (`stop()`
+/// already tears down sessions on the explicit quit/relaunch paths).
+final class AppTerminationLogger: NSObject, NSApplicationDelegate {
+    func applicationWillTerminate(_ notification: Notification) {
+        Log.app.info("applicationWillTerminate — process exiting")
     }
 }
