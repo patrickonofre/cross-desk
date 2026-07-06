@@ -49,6 +49,19 @@ struct CrossDeskApp: App {
                 menuBarInserted = true
             }
         }
+        .commands {
+            // SwiftUI wires a default "Quit CrossDesk" command (⌘Q key
+            // equivalent) even for an LSUIElement app with no visible menu
+            // bar — it bypasses MenuBarView's "Sair" button entirely, so it
+            // never logs (confirmed live: a UAT session closed with a clean
+            // `terminate:` while focusing the pairing-token TextField, but
+            // neither "quit requested via Sair button" nor "relaunch
+            // requested" appeared beforehand). The "Sair" button is the only
+            // intended way to quit this relay — replace the default with
+            // nothing so a stray ⌘Q can't silently kill an in-progress
+            // pairing/session.
+            CommandGroup(replacing: .appTermination) {}
+        }
 
         // Desk editor (layout-ux R36). LSUIElement stays: the window only
         // exists while the user keeps it open.
