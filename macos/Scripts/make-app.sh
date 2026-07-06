@@ -20,9 +20,10 @@ fi
 
 APP_DIR="../build/CrossDesk.app"
 rm -rf "$APP_DIR"
-mkdir -p "$APP_DIR/Contents/MacOS"
+mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 
 cp "$BINARY" "$APP_DIR/Contents/MacOS/CrossDesk"
+cp "../Resources/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
 
 cat > "$APP_DIR/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -35,6 +36,8 @@ cat > "$APP_DIR/Contents/Info.plist" <<'PLIST'
     <string>CrossDesk</string>
     <key>CFBundleExecutable</key>
     <string>CrossDesk</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon.icns</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
