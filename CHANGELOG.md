@@ -2,6 +2,12 @@
 
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
+## [1.1.0] - 2026-07-07
+
+### Added
+
+- Aviso de nova versão disponível: o app checa periodicamente os Releases do GitHub e mostra um rótulo discreto no popover quando há uma versão mais nova, com botão para abrir a página de download. Instalação continua manual — sem auto-instalação.
+
 ## [1.0.0] - 2026-07-07
 
 ### Added
