@@ -25,6 +25,13 @@ final class AppState: ObservableObject {
     /// only — the transport itself refuses to route over it regardless,
     /// see `DTLSParameters.prohibitedInterfaceTypes`).
     @Published var vpnActive = false
+    /// Autostart (R50-R54): mirrors `SMAppService.mainApp.status` — no bool
+    /// persisted in `AppConfig`, the OS registration is the only source of
+    /// truth (same rule already applied to TCC).
+    @Published var loginItemEnabled = false
+    /// Registered but the user hasn't approved it yet in Ajustes > Itens de
+    /// Login (R52) — `loginItemEnabled` stays true (register() did succeed).
+    @Published var loginItemNeedsApproval = false
 
     private let store = ConfigStore()
     private let browser = ServerBrowser()
@@ -52,6 +59,7 @@ final class AppState: ObservableObject {
         config = loaded
         saveConfig()
         refreshPermissions()
+        refreshLoginItemStatus()
 
         browser.onUpdate = { [weak self] servers in
             Task { @MainActor in self?.discoveredServers = servers }
@@ -73,6 +81,35 @@ final class AppState: ObservableObject {
     func refreshPermissions() {
         inputMonitoringGranted = InputCapture.hasPermission()
         accessibilityGranted = InputInjector.hasPermission()
+    }
+
+    // MARK: - Autostart (R50-R54)
+
+    func refreshLoginItemStatus() {
+        switch LoginItem.status {
+        case .enabled:
+            loginItemEnabled = true
+            loginItemNeedsApproval = false
+        case .requiresApproval:
+            loginItemEnabled = true
+            loginItemNeedsApproval = true
+        default:
+            loginItemEnabled = false
+            loginItemNeedsApproval = false
+        }
+    }
+
+    func toggleLoginItem() {
+        do {
+            if loginItemEnabled {
+                try LoginItem.unregister()
+            } else {
+                try LoginItem.register()
+            }
+        } catch {
+            Log.app.error("login item toggle failed: \(String(describing: error), privacy: .public)")
+        }
+        refreshLoginItemStatus()
     }
 
     func saveConfig() {

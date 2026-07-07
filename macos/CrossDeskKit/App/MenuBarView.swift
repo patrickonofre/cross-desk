@@ -35,13 +35,16 @@ struct MenuBarView: View {
         .frame(width: 320)
         .onAppear {
             appState.refreshPermissions()
+            appState.refreshLoginItemStatus()
             appState.updateBrowsing()
             manualHost = appState.config.serverHost
         }
-        // TCC grants happen outside the app (System Settings); poll while the
-        // panel is open so the ⚠️ flips to ✓ without user interaction.
+        // TCC grants and login-item approval happen outside the app (System
+        // Settings); poll while the panel is open so both flip without user
+        // interaction here.
         .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in
             appState.refreshPermissions()
+            appState.refreshLoginItemStatus()
         }
     }
 
@@ -421,14 +424,45 @@ struct MenuBarView: View {
     // MARK: - Shared sections
 
     private var optionsSection: some View {
-        Toggle(isOn: $appState.config.concealCursor) {
-            Text("Esconder o cursor na máquina sem foco")
-                .font(.caption)
-        }
-        .toggleStyle(.checkbox)
-        .disabled(appState.running)
-        .onChange(of: appState.config.concealCursor) {
-            appState.saveConfig()
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle(isOn: $appState.config.concealCursor) {
+                Text("Esconder o cursor na máquina sem foco")
+                    .font(.caption)
+            }
+            .toggleStyle(.checkbox)
+            .disabled(appState.running)
+            .onChange(of: appState.config.concealCursor) {
+                appState.saveConfig()
+            }
+
+            // R50/R51: binding never writes the bool directly — it only
+            // triggers register()/unregister() and lets the next status
+            // refresh (poll or immediate) correct the toggle.
+            Toggle(isOn: Binding(
+                get: { appState.loginItemEnabled },
+                set: { _ in appState.toggleLoginItem() }
+            )) {
+                Text("Abrir ao iniciar sessão")
+                    .font(.caption)
+            }
+            .toggleStyle(.checkbox)
+
+            if appState.loginItemNeedsApproval {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Pendente de aprovação em Ajustes > Itens de Login")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button("Abrir Ajustes") {
+                            LoginItem.openSettings()
+                        }
+                        .font(.caption2)
+                    }
+                }
+            }
         }
     }
 
