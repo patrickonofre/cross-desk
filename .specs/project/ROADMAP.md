@@ -11,6 +11,7 @@
 - Pasta [macos/](../../macos/), specs próprias em `macos/.specs/`.
 - MVP: servidor + cliente na mesma app, mac↔mac, transporte UDP criptografado, menubar UI mínima.
 - Detalhes e milestones em `macos/.specs/project/ROADMAP.md`.
+- **Gate de fechamento — release-1.0** (2026-07-07): tags beta descartadas, LICENSE (MIT) + CHANGELOG, 5 UATs pendentes verificados, GitHub Release `v1.0.0` publicada. Spec/tasks em [`.specs/features/release-1.0/`](../features/release-1.0/spec.md).
 
 ## Fase 2 — App Windows
 

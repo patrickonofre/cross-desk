@@ -79,6 +79,7 @@ Status: T39–T43, T45, T46 ✅ (2026-07-05, 151 testes verdes, app assina) — 
 
 - **What:** roteiro: (1) copiar/colar pequeno nos DOIS sentidos; (2) ≥1 GB c/ progresso+cancel; (3) árvore de pastas; (4) rede caída no meio → erro limpo, sem parcial, input se recupera; (7) fluidez do input durante 1 GB (se degradar → `serviceClass = .background`, D5); (8) build antigo ignora 0x50/0x51. Aceitações 5/6 já automatizadas no T43.
 - **Depends on:** T46 · **Done when:** checklist assinado no tasks.md; falhas viram tasks.
+- ✅ **2026-07-07** — usuário reportou aceitações 1,2,4,7,8 passando (roteiro `UAT-1.0.md` bloco B), sem bugs. **T47 fechado.**
 
 ## T48 — Spike I3/S1: drag real (gate da E2) `[P]` após T43
 

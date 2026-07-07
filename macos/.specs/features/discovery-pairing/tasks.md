@@ -49,7 +49,7 @@ Numeração continua a do projeto (input-polish terminou em T28). Gate padrão: 
 
 ## Fase D — Validação
 
-- ☐ **T38 — UAT discovery-pairing (2 macs)**
+- ☑ **T38 — UAT discovery-pairing (2 macs)** — ✅ 2026-07-07, usuário reportou aceitações 1–8 passando (roteiro `UAT-1.0.md` bloco A), sem bugs.
   - What: aceitações 1–8 do spec.md — visibilidade (≤3 s aparece / ≤10 s some), pareamento ok + token errado, rotação (config dos dois lados + reconexão silenciosa pós-restart), esquecer servidor (fallback R30 na prática), esquecer cliente, Rede Local negada→concedida (incerteza 2), fallback IP, regressão kvm-mvp/input-polish. Registrar rename Bonjour em colisão de nome (incerteza 4) se observado.
   - Done when: resultados por aceitação registrados no STATE.md; incertezas 1–4 do design respondidas; sobras viram pendências no STATE.
   - Requer: 2 macs na mesma LAN, TCC concedido, uma rede com mDNS ok (e, se possível, teste com mDNS bloqueado p/ aceitação 7).

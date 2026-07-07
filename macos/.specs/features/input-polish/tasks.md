@@ -51,7 +51,7 @@ Numeração continua a do projeto (kvm-mvp terminou em T18). Gate padrão: `cd m
 
 ## Fase D — Validação
 
-- ◐ **T28 — UAT input-polish + latência p95** — **ÚNICO PENDENTE** (código T19–T27 pronto, 99 testes verdes)
+- ☑ **T28 — UAT input-polish + latência p95** — ✅ 2026-07-07, usuário reportou aceitações passando (roteiro `UAT-1.0.md` bloco C), sem bugs. p95 não relatado à parte.
   - What: aceitações 1–8 do spec.md (matriz standby/wake/screensaver/display/Dock, scroll, autorepeat, convivência local, regressão kvm-mvp) + medição p95 captura→injeção (fecha R14 pendente do T15 do kvm-mvp) usando as métricas do T27.
   - Decisões a fechar no UAT:
     - **Coalescing (R23):** `MoveCoalescer` está dormente. Ler `metrics [server] capturedMouseMove=…` no log sob trackpad 90–120 Hz; se houver backlog de envio (fila>1 em regime), plugar no drain do `ServerSession`. Senão, registrar "não necessário".

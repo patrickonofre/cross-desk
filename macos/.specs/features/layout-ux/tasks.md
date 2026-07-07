@@ -79,6 +79,7 @@ Status: **T49–T56 ✅ (2026-07-05, 166 testes verdes — +15 da feature, app a
 
 - **What:** roteiro: mini-mapa segue foco em <1 s (R35); canvas reflete topologia real e monitor removido ao vivo (R36); arrastar direita→cima persiste e vale no próximo start, picker e canvas nunca divergem (R37); tabela de fases completa incl. transferência (R38); coach some após 1ª travessia e não volta pós-restart (R39); VoiceOver (R40); ícone (R41). Falhas viram tasks.
 - **Depends on:** T56 · **Done when:** checklist assinado aqui. Candidato a entrar na sessão de UAT consolidado (junto de T28/T38/T47) se a implementação chegar antes.
+- ✅ **2026-07-07** — usuário reportou aceitações R35–R41 passando (roteiro `UAT-1.0.md` bloco D), sem bugs. **T57 fechado.**
 
 ## Ordem
 
