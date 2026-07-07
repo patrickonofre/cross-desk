@@ -445,6 +445,7 @@ final class AppState: ObservableObject {
         task.executableURL = URL(fileURLWithPath: "/bin/sh")
         task.arguments = ["-c", "sleep 0.7; /usr/bin/open -n '\(path)'"]
         try? task.run()
+        AppTerminationLogger.deliberateQuitRequested = true
         NSApplication.shared.terminate(nil)
     }
 

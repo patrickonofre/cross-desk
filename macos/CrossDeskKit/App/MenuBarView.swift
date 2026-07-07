@@ -507,6 +507,7 @@ struct MenuBarView: View {
 
             Button("Sair") {
                 Log.app.info("quit requested via Sair button")
+                AppTerminationLogger.deliberateQuitRequested = true
                 NSApplication.shared.terminate(nil)
             }
         }

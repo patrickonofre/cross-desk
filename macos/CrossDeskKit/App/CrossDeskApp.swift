@@ -85,12 +85,39 @@ struct CrossDeskApp: App {
     }
 }
 
-/// Logs every app shutdown path (Sair, ⌘Q, Dock quit, System shutdown/logout,
-/// `relaunch()`) so a UAT report of "the app just closed" is diagnosable from
-/// `log show` alone instead of only from whichever call site remembered to
-/// log first. Debugging aid only — no cleanup logic belongs here (`stop()`
-/// already tears down sessions on the explicit quit/relaunch paths).
+/// Gatekeeper for every app shutdown path. This is a background relay with
+/// no "done, nothing to do" state — it must NEVER quit except through the two
+/// deliberate call sites ("Sair" in MenuBarView, `AppState.relaunch()`), both
+/// of which set `deliberateQuitRequested` immediately before calling
+/// `terminate()`. Everything else that reaches `applicationShouldTerminate`
+/// gets cancelled, including:
+/// - SwiftUI's default ⌘Q "Quit" command (also stripped in `CrossDeskApp`'s
+///   `.commands`, but that only removes the menu item — this is the actual
+///   enforcement point).
+/// - A confirmed SwiftUI Scene bug (Apple FB11447959, reproduced live in the
+///   2026-07-07 UAT: clicking the menu bar icon to collapse the popover
+///   terminated the whole app) where an app combining `Window` +
+///   `MenuBarExtra` can have AppKit decide "no scenes left" and call
+///   `terminate()` directly — with neither of our own call sites involved,
+///   so it never used to log anything either.
+/// `applicationWillTerminate` still logs so a legitimate quit is
+/// diagnosable from `log show` alone. Debugging aid only — no cleanup logic
+/// belongs here (`stop()` already tears down sessions on the explicit
+/// quit/relaunch paths).
 final class AppTerminationLogger: NSObject, NSApplicationDelegate {
+    /// Set immediately before the ONLY two deliberate quit paths call
+    /// `terminate()`. Read (and reset) once by `applicationShouldTerminate`.
+    @MainActor static var deliberateQuitRequested = false
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard Self.deliberateQuitRequested else {
+            Log.app.error("applicationShouldTerminate blocked — not a deliberate quit (neither Sair nor relaunch requested it); likely the SwiftUI Window+MenuBarExtra scene bug (FB11447959)")
+            return .terminateCancel
+        }
+        Self.deliberateQuitRequested = false
+        return .terminateNow
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         Log.app.info("applicationWillTerminate — process exiting")
     }
