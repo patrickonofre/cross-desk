@@ -27,6 +27,8 @@ struct MenuBarView: View {
             Divider()
             optionsSection
             Divider()
+            updateSection
+            Divider()
             permissionsSection
             Divider()
             footer
@@ -463,6 +465,31 @@ struct MenuBarView: View {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: - Update check (update-check R58-R62)
+
+    private var updateSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let update = appState.availableUpdate {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .foregroundStyle(.blue)
+                    Text("Nova versão \(update.version) disponível")
+                        .font(.caption)
+                        .lineLimit(1)
+                    Spacer()
+                    Button("Baixar") { appState.openUpdateDownload() }
+                        .font(.caption)
+                    Button("Ignorar") { appState.dismissUpdate() }
+                        .font(.caption)
+                }
+            }
+            Button("Verificar agora") {
+                appState.refreshUpdateCheck()
+            }
+            .font(.caption)
         }
     }
 

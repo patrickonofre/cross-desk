@@ -29,6 +29,11 @@ public struct AppConfig: Codable, Equatable, Sendable {
     /// First cursor handoff already happened on this machine — gates the
     /// one-time "push the cursor through the edge" hint (layout-ux R39).
     public var firstCrossingDone: Bool
+    /// Version the user dismissed via "Ignorar esta versão" (update-check
+    /// R60) — the update banner stays hidden until a version newer than this
+    /// one shows up, even if this one is still `releases/latest`. "" = none
+    /// dismissed.
+    public var dismissedUpdateVersion: String
 
     public init(
         role: Role = .server,
@@ -40,7 +45,8 @@ public struct AppConfig: Codable, Equatable, Sendable {
         pairedServerName: String = "",
         deviceName: String = Host.current().localizedName ?? "Mac",
         concealCursor: Bool = true,
-        firstCrossingDone: Bool = false
+        firstCrossingDone: Bool = false,
+        dismissedUpdateVersion: String = ""
     ) {
         self.role = role
         self.edgeSide = edgeSide
@@ -52,6 +58,7 @@ public struct AppConfig: Codable, Equatable, Sendable {
         self.deviceName = deviceName
         self.concealCursor = concealCursor
         self.firstCrossingDone = firstCrossingDone
+        self.dismissedUpdateVersion = dismissedUpdateVersion
     }
 
     // Tolerant decode: a config written by an older build is missing newer keys
@@ -71,6 +78,7 @@ public struct AppConfig: Codable, Equatable, Sendable {
         deviceName = try c.decodeIfPresent(String.self, forKey: .deviceName) ?? d.deviceName
         concealCursor = try c.decodeIfPresent(Bool.self, forKey: .concealCursor) ?? d.concealCursor
         firstCrossingDone = try c.decodeIfPresent(Bool.self, forKey: .firstCrossingDone) ?? d.firstCrossingDone
+        dismissedUpdateVersion = try c.decodeIfPresent(String.self, forKey: .dismissedUpdateVersion) ?? d.dismissedUpdateVersion
     }
 }
 

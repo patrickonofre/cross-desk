@@ -32,8 +32,16 @@ final class AppState: ObservableObject {
     /// Registered but the user hasn't approved it yet in Ajustes > Itens de
     /// Login (R52) — `loginItemEnabled` stays true (register() did succeed).
     @Published var loginItemNeedsApproval = false
+    /// Update-check (R55-R62): set only when the latest GitHub release is
+    /// newer than the installed version AND newer than whatever the user
+    /// last dismissed (R60). `nil` = nothing to show.
+    @Published var availableUpdate: UpdateChecker.ReleaseInfo?
 
     private let store = ConfigStore()
+    /// Fires `refreshUpdateCheck()` every 24h regardless of the popover being
+    /// open (unlike `MenuBarView`'s 2s TCC poll, which only ticks while the
+    /// view is on screen — update-check must keep running with it closed).
+    private var updateCheckTimer: Timer?
     private let browser = ServerBrowser()
     private let vpnMonitor = VPNMonitor()
     private var serverSession: ServerSession?
@@ -60,6 +68,7 @@ final class AppState: ObservableObject {
         saveConfig()
         refreshPermissions()
         refreshLoginItemStatus()
+        scheduleUpdateChecks()
 
         browser.onUpdate = { [weak self] servers in
             Task { @MainActor in self?.discoveredServers = servers }
@@ -114,6 +123,47 @@ final class AppState: ObservableObject {
 
     func saveConfig() {
         try? store.save(config)
+    }
+
+    // MARK: - Update check (R55-R62)
+
+    private func scheduleUpdateChecks() {
+        refreshUpdateCheck()
+        updateCheckTimer = Timer.scheduledTimer(withTimeInterval: 86_400, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.refreshUpdateCheck() }
+        }
+    }
+
+    /// Fire-and-forget: kicks off the async GitHub check and applies the
+    /// result later. Safe to call anytime (launch, timer, or the manual
+    /// "Verificar agora" button, R62) — never blocks the caller.
+    func refreshUpdateCheck() {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
+            let dismissed = self.config.dismissedUpdateVersion
+            guard let result = await UpdateChecker.checkLatestRelease(currentVersion: currentVersion) else {
+                return
+            }
+            // R60: a dismissed version stays hidden until something newer
+            // than IT (not just newer than the installed build) shows up.
+            guard dismissed.isEmpty || UpdateChecker.isNewer(result.version, than: dismissed) else {
+                return
+            }
+            self.availableUpdate = result
+        }
+    }
+
+    func dismissUpdate() {
+        guard let availableUpdate else { return }
+        config.dismissedUpdateVersion = availableUpdate.version
+        saveConfig()
+        self.availableUpdate = nil
+    }
+
+    func openUpdateDownload() {
+        guard let availableUpdate else { return }
+        NSWorkspace.shared.open(availableUpdate.url)
     }
 
     // MARK: - Pairing state

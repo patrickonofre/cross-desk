@@ -28,7 +28,12 @@
 - Discovery mDNS + pareamento com código curto — **adiantado para a Fase 1** na app mac (feature `discovery-pairing`, 2026-07-04); Windows/Linux herdam o contrato (PROTOCOL.md §7 + PAIR_SET/PAIR_ACK). Resta na Fase 4: upgrade PAKE (SPAKE2).
 - Clipboard sincronizado (texto/imagem).
 - Empacotamento e distribuição: dmg notarizado, msi/winget, AppImage/flatpak.
-- Auto-update por plataforma.
+- Auto-update por plataforma — **aviso de nova versão (sem auto-instalar) antecipado para a
+  app mac**, pós-1.0 (feature `update-check`, 2026-07-07): checagem via GitHub Releases API +
+  label no popover, sem Sparkle (repo é SPM puro, sem Xcode project — ver spec pra
+  raciocínio completo). Instalação continua manual. Spec em
+  `macos/.specs/features/update-check/spec.md`. Auto-instalação de verdade (Sparkle ou
+  equivalente) segue nesta fase, se/quando decidido.
 
 ## Ideias adiadas
 
