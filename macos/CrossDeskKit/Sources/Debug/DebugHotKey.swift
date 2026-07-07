@@ -25,7 +25,14 @@ public enum DebugHotKey {
         InstallEventHandler(GetEventDispatcherTarget(), debugHotKeyEventHandler, 1, &eventSpec, nil, &eventHandler)
 
         let hotKeyID = EventHotKeyID(signature: fourCharCode("CrDb"), id: 1)
-        RegisterEventHotKey(keyCode, modifiers, hotKeyID, GetEventDispatcherTarget(), 0, &hotKeyRef)
+        let status = RegisterEventHotKey(keyCode, modifiers, hotKeyID, GetEventDispatcherTarget(), 0, &hotKeyRef)
+        // Silent by default (like every other outcome of this hidden shortcut —
+        // R45), but a failure here means the combo is already claimed by
+        // another app (Rectangle/Alfred/Karabiner/BTT...) and Cmd+Shift+D will
+        // never fire; log so that failure mode isn't undiagnosable.
+        if status != noErr {
+            Log.app.error("debug hotkey registration FAILED (OSStatus \(status, privacy: .public)) — Cmd+Shift+D likely already claimed by another app")
+        }
     }
 
     fileprivate static func fire() {
