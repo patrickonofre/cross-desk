@@ -6,12 +6,12 @@
 - Golden test vectors (bytes canônicos) para conformidade entre implementações.
 - Evolui junto com a Fase 1 (a app mac é a implementação de referência).
 
-## Fase 1 — App macOS (Swift) ← ATUAL
+## Fase 1 — App macOS (Swift) ✅ FECHADA (v1.0.0, 2026-07-07)
 
 - Pasta [macos/](../../macos/), specs próprias em `macos/.specs/`.
 - MVP: servidor + cliente na mesma app, mac↔mac, transporte UDP criptografado, menubar UI mínima.
 - Detalhes e milestones em `macos/.specs/project/ROADMAP.md`.
-- **Gate de fechamento — release-1.0** (2026-07-07): tags beta descartadas, LICENSE (MIT) + CHANGELOG, 5 UATs pendentes verificados, GitHub Release `v1.0.0` publicada. Spec/tasks em [`.specs/features/release-1.0/`](../features/release-1.0/spec.md).
+- **Gate de fechamento — release-1.0**: tags beta descartadas, LICENSE (MIT) + CHANGELOG, 5 UATs verificados, [GitHub Release `v1.0.0`](https://github.com/patrickonofre/cross-desk/releases/tag/v1.0.0) publicada. Spec/tasks em [`.specs/features/release-1.0/`](../features/release-1.0/spec.md).
 
 ## Fase 2 — App Windows
 

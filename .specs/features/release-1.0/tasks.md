@@ -31,16 +31,14 @@ Gate da Fase 1: **fechado 2026-07-07** (usuário reportou os 5 blocos passando, 
 
 ## Fase 4 — Higiene de tags (depende de Fase 1+2 fechadas)
 
-- ☐ **Deletar as 15 tags beta, local** (RL1)
-  - `for t in $(git tag -l 'v0.1.0-beta.*'); do git tag -d "$t"; done`
-- ☐ **Deletar as 15 tags beta, remoto** (RL1) — ação em GitHub público, confirmar antes de rodar
-  - `git push origin --delete $(git tag -l 'v0.1.0-beta.*')` (ou uma de-cada-vez)
+- ☑ **Deletar as 15 tags beta, local** (RL1) — feito.
+- ☑ **Deletar as 15 tags beta, remoto** (RL1) — feito; `git ls-remote --tags origin` só mostra `v1.0.0`.
 
 ## Fase 5 — Publicação (depende de todas as fases acima)
 
-- ☐ **Tag `v1.0.0`** (RL9) — anotada, no commit final (build bump + docs), local + remoto.
-- ☐ **GitHub Release "v1.0.0"** (RL10) — `gh release create v1.0.0`, notas = resumo do CHANGELOG, zip do build universal anexado. Ação pública — confirmar antes de publicar.
+- ☑ **Tag `v1.0.0`** (RL9) — anotada, commit `bf1936a`, local + remoto.
+- ☑ **GitHub Release "v1.0.0"** (RL10) — publicada em https://github.com/patrickonofre/cross-desk/releases/tag/v1.0.0, `CrossDesk.zip` (universal) anexado.
 
 ## Aceitação final
 
-Ver `spec.md` §Aceitação (7 itens) — todos verdes fecha a feature.
+Todos os 7 itens de `spec.md` §Aceitação fechados — **feature concluída 2026-07-07**.
