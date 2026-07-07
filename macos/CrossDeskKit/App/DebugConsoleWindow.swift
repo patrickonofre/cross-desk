@@ -88,7 +88,7 @@ struct DebugConsoleView: View {
 }
 
 /// Hosts the hidden debug console (debug-console R43–R48) — no menu entry,
-/// reachable only via the global Cmd+Shift+D hotkey registered in
+/// reachable only via the global Cmd+Shift+\ hotkey registered in
 /// `CrossDeskApp.init`.
 @MainActor
 final class DebugConsoleWindowController: NSObject, NSWindowDelegate {

@@ -11,10 +11,10 @@
 
 ## Requisitos
 
-- **R43 — Atalho global `Cmd+Shift+D`.** Registrado via `RegisterEventHotKey` no lançamento do app, ativo independente de papel (servidor/cliente), de pareamento e de qual app está em foco. Alterna (abre se fechado, fecha se aberto) o console de debug. Nenhuma permissão nova solicitada.
+- **R43 — Atalho global `Cmd+Shift+\`.** Registrado via `RegisterEventHotKey` no lançamento do app, ativo independente de papel (servidor/cliente), de pareamento e de qual app está em foco. Alterna (abre se fechado, fecha se aberto) o console de debug. Nenhuma permissão nova solicitada.
 - **R44 — Log ao vivo no console.** Uma janela mostra, em tempo real, a saída de `log stream --predicate 'subsystem == "dev.crossdesk.mac"' --info --debug` (subprocess `Process`/`Pipe`, uma linha por evento). Latência alvo: linha aparece na UI em <1s do evento.
 - **R45 — Sem rastro nenhum de UI.** Nenhuma entrada em `MenuBarView`, nenhum item de Dock, nenhuma menção fora do código-fonte e desta spec — descobrível só por quem sabe o atalho. Presente em **todos** os builds, incluindo release assinado via `make-app.sh` (não é `#if DEBUG`) — é o build que roda em UAT real.
-- **R46 — Janela flutuante, fechável.** Nível `.floating` (fica acima de outras apps — o cenário de uso é observar o log enquanto o foco de input está na outra máquina). Fecha pelo botão padrão da janela ou repetindo `Cmd+Shift+D`.
+- **R46 — Janela flutuante, fechável.** Nível `.floating` (fica acima de outras apps — o cenário de uso é observar o log enquanto o foco de input está na outra máquina). Fecha pelo botão padrão da janela ou repetindo `Cmd+Shift+\`.
 - **R47 — Buffer limitado.** Máximo 2000 linhas em memória (FIFO — descarta as mais antigas). Uma sessão de KVM longa não pode crescer sem limite nem degradar a UI.
 - **R48 — Ações mínimas.** Botões "Limpar" (zera o buffer) e "Copiar tudo" (pasteboard) — o mínimo pra ser útil colando num relato de bug.
 - **R49 — Filtro por texto (P2, não-MVP).** Campo de busca simples (substring, case-insensitive) sobre as linhas já bufferizadas — não precisa reiniciar o stream.
@@ -40,7 +40,7 @@
 
 ## Decisões assumidas (fácil de mudar se incomodar)
 
-- Combinação exata: `Cmd+Shift+D`. Risco aceito de colidir com atalho local de outro app em foco (ex.: Safari usa `Cmd+Shift+D` pra "Adicionar Bookmarks de todas as abas") — como o hotkey é global, tem prioridade sobre o atalho local do app frontmost nesse instante. Aceitável por ser feature oculta/uso interno; trocar a tecla é mudança de uma linha.
+- Combinação exata: `Cmd+Shift+\` (trocada de `Cmd+Shift+D` em 2026-07-07 — decisão do usuário: colidia com atalhos de ferramentas de desenvolvimento). Mesmo risco genérico de colisão com atalho local de outro app em foco permanece aceito — como o hotkey é global, tem prioridade sobre o atalho local do app frontmost nesse instante. Aceitável por ser feature oculta/uso interno; trocar a tecla é mudança de uma linha (`DebugHotKey.register(keyCode:)`).
 - Janela `.floating` (sempre acima) por padrão — se atrapalhar no dia a dia, vira `.normal` fácil.
 - Buffer de 2000 linhas — ajustável, é uma constante.
 - R49 (filtro de texto) entra já na primeira implementação se o custo for baixo; não é bloqueante pra fechar a feature.

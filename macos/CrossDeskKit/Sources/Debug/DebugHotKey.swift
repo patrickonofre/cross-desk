@@ -12,9 +12,10 @@ public enum DebugHotKey {
     private static var hotKeyRef: EventHotKeyRef?
     private static var onPress: (() -> Void)?
 
-    /// Cmd+Shift+D by default (debug-console R43's assumed combo).
+    /// Cmd+Shift+\ by default (debug-console R43's combo — moved off Cmd+Shift+\
+    /// 2026-07-07, which collided with dev-tool shortcuts).
     public static func register(
-        keyCode: UInt32 = UInt32(kVK_ANSI_D),
+        keyCode: UInt32 = UInt32(kVK_ANSI_Backslash),
         modifiers: UInt32 = UInt32(cmdKey | shiftKey),
         onPress: @escaping () -> Void
     ) {
@@ -28,10 +29,10 @@ public enum DebugHotKey {
         let status = RegisterEventHotKey(keyCode, modifiers, hotKeyID, GetEventDispatcherTarget(), 0, &hotKeyRef)
         // Silent by default (like every other outcome of this hidden shortcut —
         // R45), but a failure here means the combo is already claimed by
-        // another app (Rectangle/Alfred/Karabiner/BTT...) and Cmd+Shift+D will
+        // another app (Rectangle/Alfred/Karabiner/BTT...) and Cmd+Shift+\ will
         // never fire; log so that failure mode isn't undiagnosable.
         if status != noErr {
-            Log.app.error("debug hotkey registration FAILED (OSStatus \(status, privacy: .public)) — Cmd+Shift+D likely already claimed by another app")
+            Log.app.error("debug hotkey registration FAILED (OSStatus \(status, privacy: .public)) — Cmd+Shift+\\ likely already claimed by another app")
         }
     }
 

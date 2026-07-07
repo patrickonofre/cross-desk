@@ -25,7 +25,7 @@ struct CrossDeskApp: App {
         // relay — so it must never be an auto-termination candidate.
         ProcessInfo.processInfo.disableAutomaticTermination("CrossDesk runs as a background menu bar relay")
         // Hidden debug console (debug-console R43) — no menu entry, see
-        // DebugConsoleWindow.swift. Cmd+Shift+D, works regardless of role or
+        // DebugConsoleWindow.swift. Cmd+Shift+\, works regardless of role or
         // TCC state (RegisterEventHotKey needs no permission).
         DebugHotKey.register {
             DebugConsoleWindowController.shared.toggle()
