@@ -448,6 +448,18 @@ struct MenuBarView: View {
                     .font(.caption)
             }
             .toggleStyle(.checkbox)
+            .disabled(appState.loginItemBlockedByTranslocation)
+
+            if appState.loginItemBlockedByTranslocation {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text("App aberto direto do arquivo baixado. Mova para Aplicativos (ou remova a quarentena) e reabra antes de ligar esta opção.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
 
             if appState.loginItemNeedsApproval {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {

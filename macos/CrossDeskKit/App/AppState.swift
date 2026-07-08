@@ -32,6 +32,12 @@ final class AppState: ObservableObject {
     /// Registered but the user hasn't approved it yet in Ajustes > Itens de
     /// Login (R52) — `loginItemEnabled` stays true (register() did succeed).
     @Published var loginItemNeedsApproval = false
+    /// This launch is running from an App Translocation path (Gatekeeper) —
+    /// registering a login item now would point it at a path that stops
+    /// existing at the next login. Toggle stays disabled until the user
+    /// quits, removes quarantine (or moves the app to /Applications) and
+    /// reopens it.
+    @Published var loginItemBlockedByTranslocation = false
     /// Update-check (R55-R62): set only when the latest GitHub release is
     /// newer than the installed version AND newer than whatever the user
     /// last dismissed (R60). `nil` = nothing to show.
@@ -95,6 +101,7 @@ final class AppState: ObservableObject {
     // MARK: - Autostart (R50-R54)
 
     func refreshLoginItemStatus() {
+        loginItemBlockedByTranslocation = LoginItem.isTranslocated
         switch LoginItem.status {
         case .enabled:
             loginItemEnabled = true
@@ -109,6 +116,11 @@ final class AppState: ObservableObject {
     }
 
     func toggleLoginItem() {
+        guard !LoginItem.isTranslocated else {
+            Log.app.error("login item toggle refused: app is running from an App Translocation path")
+            refreshLoginItemStatus()
+            return
+        }
         do {
             if loginItemEnabled {
                 try LoginItem.unregister()
