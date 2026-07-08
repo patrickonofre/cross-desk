@@ -2,6 +2,12 @@
 
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
+## [1.2.0] - 2026-07-08
+
+### Added
+
+- Atualização automática: o botão "Verificar Atualizações" (antes "Verificar agora") agora baixa, verifica e instala a nova versão sozinho, sem abrir o navegador — não é mais preciso baixar e instalar manualmente.
+
 ## [1.1.2] - 2026-07-07
 
 ### Fixed
