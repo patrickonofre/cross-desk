@@ -28,15 +28,16 @@
 - Discovery mDNS + pareamento com código curto — **adiantado para a Fase 1** na app mac (feature `discovery-pairing`, 2026-07-04); Windows/Linux herdam o contrato (PROTOCOL.md §7 + PAIR_SET/PAIR_ACK). Resta na Fase 4: upgrade PAKE (SPAKE2).
 - Clipboard sincronizado (texto/imagem).
 - Empacotamento e distribuição: dmg notarizado, msi/winget, AppImage/flatpak.
-- Auto-update por plataforma — **auto-instalação real via Sparkle antecipada e
-  code-complete na app mac** (feature `sparkle-auto-update`, 2026-07-08, substitui o
-  `update-check` de v1.1.0): botão "Verificar Atualizações" e a checagem automática agora
-  baixam, verificam (EdDSA) e instalam a versão nova sem passar pelo navegador — mesmo
-  mecanismo do mac-metrics-view, embutido via SPM (sem `.xcodeproj`, framework copiado e
-  assinado aninhado em `make-app.sh`). Spec em
-  `macos/.specs/features/sparkle-auto-update/spec.md`. Pendente antes de valer em produção:
-  usuário gerar a chave EdDSA, habilitar GitHub Pages e assinar o 1º release (T8 da spec —
-  fora do agente por custódia de chave/infra externa).
+- Auto-update por plataforma — **auto-instalação real via Sparkle publicada na app mac**
+  (feature `sparkle-auto-update`, [v1.2.0](https://github.com/patrickonofre/cross-desk/releases/tag/v1.2.0),
+  2026-07-08, substitui o `update-check` de v1.1.0): botão "Verificar Atualizações" e a
+  checagem automática agora baixam, verificam (EdDSA) e instalam a versão nova sem passar
+  pelo navegador — mesmo mecanismo do mac-metrics-view, embutido via SPM (sem `.xcodeproj`,
+  framework copiado e assinado aninhado em `make-app.sh`). Spec em
+  `macos/.specs/features/sparkle-auto-update/spec.md`. **Ainda não funcional de verdade**:
+  falta a chave EdDSA e o GitHub Pages (T8 da spec — fora do agente por custódia de
+  chave/infra externa); até lá o feed simplesmente não existe e a checagem falha em
+  silêncio (sem crash, comportamento coberto por teste manual).
 
 ## Ideias adiadas
 
