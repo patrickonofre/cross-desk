@@ -4,11 +4,11 @@
   (branch main, /docs) em https://patrickonofre.github.io/cross-desk/appcast.xml
   — URL configurada em SUFeedURL (macos/Scripts/make-app.sh).
 
-  Sem item ainda: nenhuma versão foi assinada com a chave EdDSA (gerada pelo
-  usuário via `bin/generate_keys` do pacote Sparkle, custódia fora deste
-  repo). Adicionar o primeiro item com macos/Scripts/sparkle-sign-release.sh
-  depois da chave existir — nunca invente uma sparkle:edSignature aqui, o
-  Sparkle recusa a instalação se a assinatura não bater.
+  Novos itens: rodar macos/Scripts/sparkle-sign-release.sh <zip> <versão>
+  <build> e colar a saída aqui (mais novo primeiro) — nunca inventar uma
+  sparkle:edSignature manualmente, o Sparkle recusa a instalação se a
+  assinatura não bater com a chave embutida no Info.plist (conta "cross-desk"
+  no Keychain de quem publica).
 -->
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
     <channel>
@@ -16,5 +16,17 @@
         <link>https://patrickonofre.github.io/cross-desk/appcast.xml</link>
         <description>Appcast for CrossDesk auto-update.</description>
         <language>pt-BR</language>
+        <item>
+            <title>1.2.1</title>
+            <pubDate>Tue, 07 Jul 2026 23:48:27 -0300</pubDate>
+            <sparkle:version>22</sparkle:version>
+            <sparkle:shortVersionString>1.2.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure
+                url="https://github.com/patrickonofre/cross-desk/releases/download/v1.2.1/CrossDesk.zip"
+                sparkle:edSignature="ztiZ4W6YklD+i32B0MYo3cvEHTWIFpwwA6KvJF1AMYoxHE8gZT/EwM2nDabN38slzmgH9HChIkpCdqU5/kVHAg=="
+                length="2533748"
+                type="application/octet-stream" />
+        </item>
     </channel>
 </rss>

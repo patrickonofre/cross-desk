@@ -31,8 +31,10 @@ if [[ ! -x "$SIGN_TOOL" ]]; then
     exit 1
 fi
 
+# sign_update's own stdout already includes both edSignature and length
+# attributes (e.g. `sparkle:edSignature="..." length="..."`) — don't add a
+# second length= or the appcast item ends up with a duplicate attribute.
 SIGNATURE_LINE="$("$SIGN_TOOL" --account cross-desk "$OLDPWD/$ZIP")"
-LENGTH=$(stat -f%z "$OLDPWD/$ZIP")
 PUB_DATE=$(date -R)
 
 cat <<ITEM
@@ -48,7 +50,6 @@ Cole este <item> dentro de <channel> em docs/appcast.xml (mais novo primeiro):
             <enclosure
                 url="https://github.com/patrickonofre/cross-desk/releases/download/v$SHORT_VERSION/CrossDesk.zip"
                 $SIGNATURE_LINE
-                length="$LENGTH"
                 type="application/octet-stream" />
         </item>
 ITEM
