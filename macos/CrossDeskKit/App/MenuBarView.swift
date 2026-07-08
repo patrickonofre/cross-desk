@@ -480,26 +480,26 @@ struct MenuBarView: View {
         }
     }
 
-    // MARK: - Update check (update-check R58-R62)
+    // MARK: - Update check (sparkle-auto-update)
 
     private var updateSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            if let update = appState.availableUpdate {
+            if let version = appState.availableUpdate {
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.down.circle.fill")
                         .foregroundStyle(.blue)
-                    Text("Nova versão \(update.version) disponível")
+                    Text("Nova versão \(version) disponível")
                         .font(.caption)
                         .lineLimit(1)
                     Spacer()
-                    Button("Baixar") { appState.openUpdateDownload() }
+                    Button("Instalar") { appState.installUpdate() }
                         .font(.caption)
                     Button("Ignorar") { appState.dismissUpdate() }
                         .font(.caption)
                 }
             }
-            Button("Verificar agora") {
-                appState.refreshUpdateCheck()
+            Button("Verificar Atualizações") {
+                appState.installUpdate()
             }
             .font(.caption)
         }

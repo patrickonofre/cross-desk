@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Appcast do CrossDesk (sparkle-auto-update). Hospedado via GitHub Pages
+  (branch main, /docs) em https://patrickonofre.github.io/cross-desk/appcast.xml
+  — URL configurada em SUFeedURL (macos/Scripts/make-app.sh).
+
+  Sem item ainda: nenhuma versão foi assinada com a chave EdDSA (gerada pelo
+  usuário via `bin/generate_keys` do pacote Sparkle, custódia fora deste
+  repo). Adicionar o primeiro item com macos/Scripts/sparkle-sign-release.sh
+  depois da chave existir — nunca invente uma sparkle:edSignature aqui, o
+  Sparkle recusa a instalação se a assinatura não bater.
+-->
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <channel>
+        <title>CrossDesk</title>
+        <link>https://patrickonofre.github.io/cross-desk/appcast.xml</link>
+        <description>Appcast for CrossDesk auto-update.</description>
+        <language>pt-BR</language>
+    </channel>
+</rss>
