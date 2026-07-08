@@ -2,6 +2,12 @@
 
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
+## [1.1.2] - 2026-07-07
+
+### Fixed
+
+- Autostart ("Abrir ao iniciar sessão") podia ficar registrado sem nunca abrir de fato, quando o app era iniciado direto do arquivo baixado sem remover a quarentena primeiro. A opção agora fica desabilitada com um aviso nesse caso, evitando a entrada "fantasma" em Ajustes > Itens de Login.
+
 ## [1.1.1] - 2026-07-07
 
 ### Fixed
