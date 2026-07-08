@@ -2,6 +2,12 @@
 
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versionamento [SemVer](https://semver.org/lang/pt-BR/).
 
+## [1.2.1] - 2026-07-08
+
+### Fixed
+
+- A v1.2.0 publicou a atualização automática com uma chave de verificação de placeholder — a checagem falhava em silêncio (sem crash), mas nunca encontrava nada de verdade. Esta versão embute a chave EdDSA real; é a primeira que efetivamente encontra e instala atualizações sozinha.
+
 ## [1.2.0] - 2026-07-08
 
 ### Added

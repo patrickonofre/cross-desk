@@ -51,9 +51,9 @@ cat > "$APP_DIR/Contents/Info.plist" <<'PLIST'
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.2.0</string>
+    <string>1.2.1</string>
     <key>CFBundleVersion</key>
-    <string>21</string>
+    <string>22</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>LSUIElement</key>
@@ -69,7 +69,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<'PLIST'
     <key>SUFeedURL</key>
     <string>https://patrickonofre.github.io/cross-desk/appcast.xml</string>
     <key>SUPublicEDKey</key>
-    <string>PREENCHER-APOS-GERAR-A-CHAVE-COM-generate_keys</string>
+    <string>rhtm2zpLsvnkuXRBkkdZOvB/GqCKtcL585bo6jRnP68=</string>
     <key>SUEnableAutomaticChecks</key>
     <true/>
     <key>SUEnableSystemProfiling</key>

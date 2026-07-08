@@ -2,10 +2,12 @@
 # sparkle-sign-release.sh — assina o zip de uma release com a chave EdDSA do
 # Sparkle e imprime o <item> pronto pra colar em docs/appcast.xml.
 #
-# Pré-requisito: a chave privada já existe no Keychain (rodar
-# `.build/artifacts/sparkle/Sparkle/bin/generate_keys` uma vez, manualmente —
-# esse passo não é feito por este script nem por qualquer automação: a chave
-# nunca deve passar por um agente ou CI).
+# Pré-requisito: a chave privada já existe no Keychain, conta "cross-desk"
+# (rodar `.build/artifacts/sparkle/Sparkle/bin/generate_keys --account
+# cross-desk` uma vez — exclusiva deste app, separada da conta padrão usada
+# por outros projetos na mesma máquina). O comando nunca imprime a chave
+# privada, só a pública — é seguro rodar mesmo via agente, desde que com
+# confirmação explícita do dono da chave.
 #
 # Uso:
 #   macos/Scripts/sparkle-sign-release.sh <caminho-do-zip> <versão-curta> <build>
@@ -29,7 +31,7 @@ if [[ ! -x "$SIGN_TOOL" ]]; then
     exit 1
 fi
 
-SIGNATURE_LINE="$("$SIGN_TOOL" "$OLDPWD/$ZIP")"
+SIGNATURE_LINE="$("$SIGN_TOOL" --account cross-desk "$OLDPWD/$ZIP")"
 LENGTH=$(stat -f%z "$OLDPWD/$ZIP")
 PUB_DATE=$(date -R)
 
