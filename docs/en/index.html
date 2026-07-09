@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script>document.documentElement.classList.add("js");</script>
+    <title>CrossDesk — keyboard and mouse sharing between Macs</title>
+    <meta name="description" content="Share keyboard and mouse between Macs over the network, no video. Native, free, open-source app — encrypted, no telemetry.">
+    <link rel="canonical" href="https://patrickonofre.github.io/cross-desk/en/">
+    <link rel="alternate" hreflang="pt-br" href="https://patrickonofre.github.io/cross-desk/">
+    <link rel="alternate" hreflang="en" href="https://patrickonofre.github.io/cross-desk/en/">
+    <link rel="alternate" hreflang="x-default" href="https://patrickonofre.github.io/cross-desk/">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+    <meta name="author" content="Patrick Onofre">
+    <meta name="theme-color" content="#0b0c10" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="CrossDesk">
+    <meta property="og:url" content="https://patrickonofre.github.io/cross-desk/en/">
+    <meta property="og:title" content="CrossDesk — keyboard and mouse sharing between Macs">
+    <meta property="og:description" content="Share keyboard and mouse between Macs over the network, no video. Native, encrypted, telemetry-free.">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:locale:alternate" content="pt_BR">
+
+    <link rel="icon" href="../assets/app-icon.png">
+    <link rel="apple-touch-icon" href="../assets/app-icon.png">
+    <link rel="stylesheet" href="../styles.css">
+    <script src="../i18n.js" defer></script>
+    <script src="../site.js" defer></script>
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "CrossDesk",
+      "operatingSystem": "macOS 14+",
+      "applicationCategory": "UtilitiesApplication",
+      "description": "Native macOS app that shares keyboard and mouse with other Macs over the local network, no video, with encrypted UDP transport (DTLS-PSK).",
+      "url": "https://patrickonofre.github.io/cross-desk/en/",
+      "softwareVersion": "1.2.1",
+      "datePublished": "2026-07-07",
+      "dateModified": "2026-07-08",
+      "inLanguage": ["en", "pt-BR"],
+      "downloadUrl": "https://github.com/patrickonofre/cross-desk/releases/latest",
+      "installUrl": "https://patrickonofre.github.io/cross-desk/en/#download",
+      "releaseNotes": "https://patrickonofre.github.io/cross-desk/en/#timeline",
+      "sameAs": "https://github.com/patrickonofre/cross-desk",
+      "isAccessibleForFree": true,
+      "license": "https://github.com/patrickonofre/cross-desk/blob/main/LICENSE",
+      "author": {
+        "@type": "Person",
+        "name": "Patrick Onofre",
+        "url": "https://github.com/patrickonofre"
+      },
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="#top" aria-label="CrossDesk">
+          <img src="../assets/app-icon.png" alt="" width="28" height="28">
+          <span>CrossDesk</span>
+        </a>
+        <nav class="nav" aria-label="Main navigation">
+          <a href="#how" data-i18n="nav.how">How it works</a>
+          <a href="#features" data-i18n="nav.features">Features</a>
+          <a href="#privacy" data-i18n="nav.privacy">Privacy</a>
+          <a href="#install" data-i18n="nav.install">Install</a>
+          <a href="#download" data-i18n="nav.download">Download</a>
+        </nav>
+        <span class="nav-cross">
+          <a href="https://patrickonofre.github.io/">All apps</a>
+          <a href="https://patrickonofre.github.io/mac-metrics-view/">Mac Metrics View</a>
+        </span>
+        <div class="lang-switch" role="group" aria-label="Idioma / Language">
+          <button type="button" data-lang-option="pt" aria-pressed="false">PT</button>
+          <button type="button" data-lang-option="en" aria-pressed="true">EN</button>
+        </div>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <p class="eyebrow" data-i18n="hero.eyebrow">Version 1.2 for macOS</p>
+        <h1 data-i18n="hero.title">One cursor, all your screens.</h1>
+        <p class="lede" data-i18n="hero.lede">
+          Share keyboard and mouse between Macs over the local network, no video — the cursor crosses the screen edge and takes over the other computer.
+        </p>
+        <div class="actions" aria-label="Main actions">
+          <a class="button primary" href="https://github.com/patrickonofre/cross-desk/releases/latest" data-i18n="hero.cta">Download CrossDesk</a>
+          <a class="link-cta" href="#how"><span data-i18n="hero.secondary">See how it works</span> <span aria-hidden="true">&rsaquo;</span></a>
+        </div>
+        <p class="note" data-i18n="hero.note">No account. No telemetry. Traffic is always encrypted.</p>
+        <p class="badge-row" data-i18n="hero.badges">1.2.1 · macOS 14+ · Open source (MIT) · mac ↔ mac</p>
+      </section>
+
+      <section class="section reveal-init" id="how">
+        <div class="section-heading">
+          <p class="eyebrow" data-i18n="how.eyebrow">How it works</p>
+          <h2 data-i18n="how.title">One server, one or more clients.</h2>
+          <p class="section-lede" data-i18n="how.lede">One Mac is the server (owns the keyboard and mouse); the others are clients. The cursor crosses the screen edge as if it were a single desktop.</p>
+        </div>
+
+        <div class="diagram" role="img" aria-label="Diagram showing the cursor crossing from the server Mac's screen to the client Mac's screen">
+          <svg viewBox="0 0 640 240" xmlns="http://www.w3.org/2000/svg">
+            <rect x="20" y="30" width="270" height="180" rx="16" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/>
+            <rect x="350" y="30" width="270" height="180" rx="16" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/>
+            <text x="155" y="22" text-anchor="middle" font-size="14" font-weight="600" fill="var(--muted)" data-i18n="how.diagramServer">Server</text>
+            <text x="485" y="22" text-anchor="middle" font-size="14" font-weight="600" fill="var(--muted)" data-i18n="how.diagramClient">Client</text>
+            <path d="M 260 120 C 300 90, 320 90, 350 120" stroke="var(--accent)" stroke-width="3" stroke-dasharray="6 6" fill="none"/>
+            <circle cx="230" cy="120" r="10" fill="var(--accent)"/>
+            <path d="M 226 116 L 236 120 L 226 124 Z" fill="var(--surface)"/>
+          </svg>
+        </div>
+
+        <ol class="diagram-steps">
+          <li><span class="step-num" aria-hidden="true">1</span><span data-i18n="how.step1">On the server, pick the screen edge — CrossDesk shows the pairing code and address.</span></li>
+          <li><span class="step-num" aria-hidden="true">2</span><span data-i18n="how.step2">On the client, enter the address and short code — pairing derives the key locally, nothing travels over the network.</span></li>
+          <li><span class="step-num" aria-hidden="true">3</span><span data-i18n="how.step3">Move the cursor to the edge: control switches to the other Mac. Esc×3 always returns control to the server.</span></li>
+        </ol>
+      </section>
+
+      <section class="section reveal-init" id="features">
+        <div class="section-heading">
+          <p class="eyebrow" data-i18n="features.eyebrow">Built to be fast and secure</p>
+          <h2 data-i18n="features.title">Fast, simple, and secure by default.</h2>
+        </div>
+        <div class="feature-grid">
+          <article class="card"><h3 data-i18n="features.udpTitle">Low latency</h3><p data-i18n="features.udpBody"></p></article>
+          <article class="card"><h3 data-i18n="features.securityTitle">Encrypted by default</h3><p data-i18n="features.securityBody"></p></article>
+          <article class="card"><h3 data-i18n="features.pairTitle">Simple pairing</h3><p data-i18n="features.pairBody"></p></article>
+          <article class="card"><h3 data-i18n="features.escTitle">Esc×3 always works</h3><p data-i18n="features.escBody"></p></article>
+          <article class="card"><h3 data-i18n="features.autostartTitle">Opens with the system</h3><p data-i18n="features.autostartBody"></p></article>
+          <article class="card"><h3 data-i18n="features.updateTitle">Automatic updates</h3><p data-i18n="features.updateBody"></p></article>
+          <article class="card"><h3 data-i18n="features.clipboardTitle">Files between Macs</h3><p data-i18n="features.clipboardBody"></p></article>
+        </div>
+      </section>
+
+      <section class="section split reveal-init" id="privacy">
+        <div>
+          <p class="eyebrow" data-i18n="privacy.eyebrow">Privacy and security</p>
+          <h2 data-i18n="privacy.title">Nothing travels in plaintext.</h2>
+        </div>
+        <div class="copy-block">
+          <p data-i18n="privacy.body">
+            CrossDesk connects your Macs over UDP with DTLS-PSK encryption — no plaintext mode, no account, no cloud server. The protocol is public and documented.
+          </p>
+          <ul>
+            <li data-i18n="privacy.li1">No user account</li>
+            <li data-i18n="privacy.li2">No in-app telemetry</li>
+            <li data-i18n="privacy.li3">Open, versioned protocol in the repository</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section reveal-init" id="install">
+        <div class="section-heading">
+          <p class="eyebrow" data-i18n="install.eyebrow">Installation</p>
+          <h2 data-i18n="install.title">Not notarized by Apple yet — that's expected.</h2>
+        </div>
+        <p class="firstrun-lede" data-i18n="install.lede">
+          CrossDesk doesn't have an Apple Developer account yet, so macOS blocks the first launch as a precaution. Allow it like this:
+        </p>
+        <ol class="steps">
+          <li class="card step">
+            <span class="step-num" aria-hidden="true">1</span>
+            <h3 data-i18n="install.s1Title">Download and move to Applications</h3>
+            <p data-i18n="install.s1Body">Download the latest release .zip and move CrossDesk.app to your Applications folder.</p>
+          </li>
+          <li class="card step">
+            <span class="step-num" aria-hidden="true">2</span>
+            <h3 data-i18n="install.s2Title">Remove quarantine</h3>
+            <p data-i18n="install.s2Body">Open Terminal and run: <code>xattr -cr /Applications/CrossDesk.app</code></p>
+          </li>
+          <li class="card step">
+            <span class="step-num" aria-hidden="true">3</span>
+            <h3 data-i18n="install.s3Title">Grant permissions</h3>
+            <p data-i18n="install.s3Body">In System Settings → Privacy & Security: Input Monitoring on the server, Accessibility on the client.</p>
+          </li>
+        </ol>
+        <p class="firstrun-alt" data-i18n="install.update">
+          After this first install, new versions arrive through the app itself via Sparkle — no more browser trips.
+        </p>
+      </section>
+
+      <section class="download-panel reveal-init" id="download">
+        <div>
+          <p class="eyebrow" data-i18n="download.eyebrow">Download</p>
+          <h2 data-i18n="download.title">Download version 1.2.1.</h2>
+          <p data-i18n="download.body">
+            For macOS 14 or later. Stable for mac ↔ mac; Windows and Linux in future phases. Not notarized yet — see the install section above.
+          </p>
+          <p class="download-meta" data-i18n="download.meta">macOS 14+ · Universal (Apple Silicon + Intel) · free and open source (MIT)</p>
+        </div>
+        <a class="button primary large" href="https://github.com/patrickonofre/cross-desk/releases/latest" data-i18n="download.cta">Download on GitHub Releases</a>
+      </section>
+
+      <section class="section reveal-init" id="timeline">
+        <div class="section-heading">
+          <p class="eyebrow" data-i18n="timeline.eyebrow">Timeline</p>
+          <h2 data-i18n="timeline.title">From 1.0 to 1.2.1.</h2>
+          <p class="section-lede" data-i18n="timeline.lede">Windows and Linux are coming in future phases — today the focus is mac ↔ mac.</p>
+        </div>
+        <ol class="timeline">
+          <li class="timeline-item"><h3 data-i18n="timeline.v121Title">1.2.1 — Automatic updates, for real</h3><p data-i18n="timeline.v121Body"></p></li>
+          <li class="timeline-item"><h3 data-i18n="timeline.v120Title">1.2.0 — Installs itself</h3><p data-i18n="timeline.v120Body"></p></li>
+          <li class="timeline-item"><h3 data-i18n="timeline.v112Title">1.1.2 — More reliable autostart</h3><p data-i18n="timeline.v112Body"></p></li>
+          <li class="timeline-item"><h3 data-i18n="timeline.v110Title">1.1.0 — New-version notice</h3><p data-i18n="timeline.v110Body"></p></li>
+          <li class="timeline-item"><h3 data-i18n="timeline.v100Title">1.0.0 — First stable release</h3><p data-i18n="timeline.v100Body"></p></li>
+        </ol>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>CrossDesk</span>
+      <span data-i18n="footer.tagline">Version 1.2 for macOS</span>
+      <span class="footer-links">
+        <a href="https://github.com/patrickonofre/cross-desk" data-i18n="footer.github">GitHub</a>
+        <a href="https://patrickonofre.github.io/">All apps</a>
+        <a href="https://patrickonofre.github.io/mac-metrics-view/">Mac Metrics View</a>
+        <span data-i18n="footer.rights">Open source · MIT License</span>
+      </span>
+    </footer>
+
+    <a class="sticky-cta" href="https://github.com/patrickonofre/cross-desk/releases/latest" data-sticky-cta>
+      <span class="sticky-cta-label" data-i18n="sticky.label">CrossDesk 1.2</span>
+      <span class="sticky-cta-button" data-i18n="sticky.cta">Download</span>
+    </a>
+  </body>
+</html>

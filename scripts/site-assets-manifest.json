@@ -1,0 +1,10 @@
+{
+  "$comment": "Marketing-site image manifest for CrossDesk. Unlike mac-metrics-view (real popover screenshots), this site launches with SVG placeholders for the how-it-works diagram (inline in docs/index.html, no binary asset) — see .specs/features/site-produto/design.md. Only the app icon is a real binary asset today.",
+  "assetsDir": "docs/assets",
+  "byteBudgetKB": { "icon": 100 },
+  "icon": {
+    "file": "app-icon.png",
+    "width": 256,
+    "height": 256
+  }
+}
